@@ -15,6 +15,20 @@ Antes de modificar archivos:
 
 No cargar toda la documentación por defecto. Obtener contexto de manera progresiva y bajo demanda.
 
+## Orientación del proyecto
+
+Nuari es un SaaS multi-tenant para centralizar la operación cotidiana de pequeños negocios sin convertirse inicialmente en un ERP ni intentar cubrir todos los mercados. La visión vigente está en [`docs/product/vision.md`](docs/product/vision.md) y el MVP debe validar un único flujo vertical que reemplace un registro manual real; consultar [`docs/product/mvp.md`](docs/product/mvp.md) antes de proponer funcionalidades.
+
+El foco operativo actual, incluido el negocio piloto y el próximo paso, vive en [`.ai/context_snapshot.md`](.ai/context_snapshot.md). No inventar el piloto, su métrica ni módulos fuera del flujo aprobado. `Bastardos` es un antecedente útil, no una decisión de producto.
+
+La estructura vigente separa frontend Next.js en `app/` y API NestJS en `api/`; la API es un monolito modular y la única capa con acceso directo a PostgreSQL. Nuari usará autenticación propia: sus límites y decisiones de seguridad están documentados en [`ADR-005`](docs/architecture/decisions/ADR-005-custom-authentication.md). Autenticación, autorización y lógica de negocio deben permanecer conceptualmente separadas.
+
+## Coordinación entre agentes
+
+Para cambios no triviales, usar `docs/tasks/` como contrato: primero definir alcance y criterios, luego implementar y finalmente revisar el diff contra la tarea. En OpenCode, [`architect`](.opencode/agents/architect.md) diseña sin tocar código y crea la tarea; [`coder`](.opencode/agents/coder.md) implementa tareas existentes y actualiza sólo sus secciones de implementación; [`fast`](.opencode/agents/fast.md) atiende cambios simples y de bajo riesgo; [`reviewer`](.opencode/agents/reviewer.md) busca defectos y no corrige el código. Una IA sin estos roles debe separar explícitamente esas etapas y conservar las mismas restricciones.
+
+Las tareas pequeñas pueden omitir una especificación formal si no aporta valor. Las instrucciones del entorno o del agente pueden restringir más el trabajo, pero nunca relajar estas reglas ni los invariantes del repositorio.
+
 ## Reglas de producto no negociables
 
 - `Organization` es el límite de tenant.
@@ -24,6 +38,7 @@ No cargar toda la documentación por defecto. Obtener contexto de manera progres
 - Un turno puede existir sin venta; un pedido puede existir sin pago; una venta puede existir sin turno ni pedido; una venta puede tener uno o varios pagos.
 - La IA y WhatsApp serán capas futuras de automatización. No son requisitos para que el producto principal funcione.
 - Una futura IA no tendrá acceso libre a la base: utilizará operaciones explícitas y autorizadas de Nuari.
+- Autenticación y autorización son responsabilidades distintas: la primera identifica al usuario y la segunda valida membresía, organización, rol y permisos en backend.
 
 ## Reglas de arquitectura
 
@@ -34,6 +49,7 @@ No cargar toda la documentación por defecto. Obtener contexto de manera progres
 - Mantener las consultas tenant-aware y probar el aislamiento entre organizaciones.
 - No agregar una dependencia de producción sin justificar su necesidad, mantenimiento y efecto sobre el stack.
 - No incorporar una decisión arquitectónica importante sin registrarla o actualizarla en `docs/architecture/decisions/`.
+- No introducir microservicios, infraestructura distribuida ni dependencias externas sin una necesidad demostrable y una decisión documentada.
 
 ## Documentación viva y definición de terminado
 

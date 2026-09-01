@@ -17,6 +17,7 @@ Seleccionar el negocio piloto del MVP y definir el primer flujo vertical que ree
 - Cliente Prisma 7 regenerado desde `api/`.
 - Dependencia no utilizada `@nestjs/mau` eliminada junto con su script de deploy.
 - Documentación canónica migrada a rutas y comandos npm.
+- Guía compartida para agentes actualizada; roles de OpenCode, flujo de tareas y fuentes canónicas documentados en `AGENTS.md`.
 
 ## Decisiones vigentes
 
@@ -25,6 +26,7 @@ Seleccionar el negocio piloto del MVP y definir el primer flujo vertical que ree
 - La API es la única capa con acceso directo a PostgreSQL.
 - La comunicación inicial web/API es REST mediante Axios.
 - El backend inicia como monolito modular, no como microservicios.
+- La API se implementará con NestJS y la autenticación será propia; sus requisitos base están en `docs/architecture/decisions/ADR-005-custom-authentication.md`.
 - Prisma permanece en la versión mayor 7 hasta evaluar explícitamente otra versión mayor.
 
 ## Verificación de la migración

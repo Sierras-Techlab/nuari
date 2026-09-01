@@ -30,7 +30,7 @@ Se acordó desplegar NestJS como proceso o contenedor, pero no se eligió entre 
 
 ### Autenticación
 
-Better Auth es el candidato actual. Falta validar el modelo de integración con NestJS, sesiones, cookies entre dominios y membresías multi-organización antes de adoptarlo.
+Se decidió implementar autenticación propia en NestJS. La funcionalidad aún no está implementada; quedan por diseñar y validar en una tarea específica los detalles de integración, configuración de cookies entre dominios, expiración y revocación de sesiones, verificación de correo, recuperación de contraseña y rate limiting. Los requisitos base están en [`ADR-005`](../docs/architecture/decisions/ADR-005-custom-authentication.md).
 
 ### Política monetaria y temporal
 

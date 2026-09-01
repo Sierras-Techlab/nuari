@@ -16,7 +16,7 @@ Depende de identidad para asociar membresías, sin apropiarse de la autenticaci�
 
 Responsable de usuarios, sesiones, membresías, roles y autorización.
 
-La solución de autenticación concreta deberá validarse con NestJS antes de adoptarse. Better Auth es la alternativa actualmente considerada, no una implementación existente.
+Nuari implementará autenticación propia en NestJS. La decisión, sus límites y sus requisitos de seguridad están documentados en [`ADR-005`](decisions/ADR-005-custom-authentication.md); esta funcionalidad todavía no está implementada.
 
 ### Staff
 

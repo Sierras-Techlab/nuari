@@ -22,6 +22,7 @@ Este directorio contiene la fuente de verdad legible para producto, arquitectura
 - [`architecture/decisions/ADR-002-managed-postgresql.md`](architecture/decisions/ADR-002-managed-postgresql.md)
 - [`architecture/decisions/ADR-003-tenant-isolation.md`](architecture/decisions/ADR-003-tenant-isolation.md)
 - [`architecture/decisions/ADR-004-living-documentation.md`](architecture/decisions/ADR-004-living-documentation.md)
+- [`architecture/decisions/ADR-005-custom-authentication.md`](architecture/decisions/ADR-005-custom-authentication.md)
 
 ## Desarrollo
 
@@ -30,6 +31,8 @@ Este directorio contiene la fuente de verdad legible para producto, arquitectura
 - [`development/conventions.md`](development/conventions.md): convenciones de código y colaboración.
 
 ## Planes de implementación
+
+- [`tasks/`](tasks/): contratos de implementación y revisión entre agentes.
 
 - [`superpowers/plans/2026-08-31-npm-root-layout.md`](superpowers/plans/2026-08-31-npm-root-layout.md): migración vigente a `app/` y `api/` como proyectos npm independientes.
 - [`superpowers/plans/2026-08-27-project-initialization.md`](superpowers/plans/2026-08-27-project-initialization.md): plan histórico de la inicialización original, reemplazado en su estructura de paquetes.
