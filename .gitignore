@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Generated database client
+api/src/generated/prisma/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Logs and local tooling
+*.log
+.codex-log/
+graphify-out/
+
+# Editor and operating system
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
