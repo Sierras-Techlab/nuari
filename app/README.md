@@ -26,6 +26,8 @@ Las animaciones de entrada de la landing usan `src/components/marketing/reveal.t
 
 La landing incorpora navbar responsive, mockups HTML, bento, casos de uso, precios estáticos, integraciones futuras y un FAQ nativo con `<details>`. `/login` y `/register` continúan siendo destinos preparados; no implica que el registro, el cobro ni las integraciones estén disponibles. Satoshi no está incluida porque no existe un asset local con procedencia verificable; mientras tanto se conserva Manrope como fallback optimizado.
 
+Las rutas públicas `/login` y `/register` ahora contienen la interfaz de autenticación de referencia: son formularios demostrativos, accesibles y responsive, sin integración API ni persistencia de credenciales. El submit queda deshabilitado sin JavaScript y, al hidratarse, sólo muestra un estado informativo honesto.
+
 ## Verificación
 
 ```bash

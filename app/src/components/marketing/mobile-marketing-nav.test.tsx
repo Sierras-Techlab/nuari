@@ -26,4 +26,12 @@ describe("MobileMarketingNav", () => {
     fireEvent.click(screen.getByRole("link", { name: "Soluciones" }));
     expect(screen.queryByRole("navigation", { name: "Navegación principal" })).toBeNull();
   });
+
+  it("routes mobile access and signup CTAs to the auth pages", () => {
+    render(<MobileMarketingNav />);
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
+
+    expect(screen.getByRole("link", { name: "Ingresar" }).getAttribute("href")).toBe("/login");
+    expect(screen.getByRole("link", { name: "Comenzar gratis" }).getAttribute("href")).toBe("/register");
+  });
 });
