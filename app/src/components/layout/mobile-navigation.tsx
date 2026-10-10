@@ -20,10 +20,10 @@ export function MobileNavigation() {
 
   return (
     <div className="relative md:hidden">
-      <Button aria-controls="mobile-app-navigation" aria-expanded={open} aria-label={open ? "Cerrar navegación" : "Abrir navegación"} onClick={() => setOpen((current) => !current)} size="icon" variant="outline">
+      <Button aria-controls="mobile-app-navigation" aria-expanded={open} aria-label={open ? "Cerrar navegación" : "Abrir navegación"} onClick={() => setOpen((current) => !current)} size="icon" variant="outline" className="border-[#E4E9E7] bg-white text-[#182026]">
         <span aria-hidden="true" className="text-lg leading-none">{open ? "×" : "☰"}</span>
       </Button>
-      {open ? <div id="mobile-app-navigation" className="absolute right-0 top-12 z-10 w-52 rounded-lg border bg-card p-2 shadow-lg"><AppNavigation onNavigate={() => setOpen(false)} /></div> : null}
+      {open ? <div id="mobile-app-navigation" className="absolute right-0 top-12 z-30 max-h-[calc(100vh-5rem)] w-64 overflow-y-auto rounded-2xl border border-white/10 bg-[#182026] p-3 text-white shadow-[0_20px_45px_-15px_rgba(24,32,38,.5)]"><AppNavigation onNavigate={() => setOpen(false)} /></div> : null}
     </div>
   );
 }

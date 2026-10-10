@@ -12,13 +12,15 @@ Nuari será un SaaS por suscripción que centralice la operación diaria de esto
 
 Nuari no se define únicamente como turnero ni como ecommerce. Su núcleo es una plataforma de gestión que puede combinar servicios y comercio.
 
+La primera interfaz de servicios se presenta como módulo **Turnero**: agenda, turnos y catálogo de servicios. La identidad visual del módulo es genérica para negocios con citas. El frontend también presenta Clientes, Caja y Equipo como secciones compartidas del espacio; sus operaciones reales, permisos y datos siguen pendientes de API. Clientes, caja y acceso de usuarios pertenecen al núcleo compartido, aunque el Turnero los utilice. Una eventual solución de hotelería o reservas por recursos tendría un flujo y calendario propios; todavía no forma parte del MVP aprobado.
+
 ## Usuarios objetivo iniciales
 
 - Pequeños negocios de servicios, como barberías y centros de estética.
 - Pequeños comercios que necesitan productos, stock y pedidos.
 - Negocios híbridos que prestan servicios y venden productos.
 
-El primer tipo de negocio piloto todavía debe seleccionarse antes de cerrar el alcance funcional del MVP.
+Barberías y negocios de servicios similares son el primer segmento de exploración. Todavía falta seleccionar un negocio piloto concreto y confirmar su flujo manual y métrica antes de cerrar el alcance funcional del MVP.
 
 ## Capacidades del producto
 

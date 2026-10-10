@@ -18,7 +18,9 @@ Las llamadas HTTP deben utilizar `src/lib/api/api-client.ts`. No colocar URLs de
 
 Los tokens semánticos viven en `src/app/globals.css` y las primitivas reutilizables de shadcn/ui en `src/components/ui/`. Usar `cn` desde `src/lib/utils.ts` para combinar clases; no duplicar variantes en las páginas. La ruta `/__ui` es una referencia visual disponible sólo durante el desarrollo y no reemplaza la landing pública `/`.
 
-El shell interno vive en el route group `(app)` y se prueba desde `/app`. La ruta `/` no está envuelta por este shell. La navegación inicial es deliberadamente mínima hasta que se seleccione el flujo piloto; no representa permisos reales ni un tenant context.
+El shell interno vive en el route group `(app)` y se prueba desde `/app`. La ruta `/` no está envuelta por este shell. La sidebar muestra el módulo activo **Turnero** con Inicio, Agenda, Servicios, Clientes, Caja y Equipo. Todas estas rutas tienen interfaz navegable y estado local. No hay sesión, permisos ni tenant context reales; los cambios viven sólo en memoria y se reinician al recargar. Por decisión de interfaz, las páginas internas no muestran avisos de demostración: este límite debe mantenerse explícito en documentación y durante la revisión del producto.
+
+La UI de agenda consume `src/features/appointments/types.ts` mediante `AppointmentSource`. `demo-source.ts` implementa ese contrato con datos locales y `demo-provider.tsx` mantiene la fuente durante la navegación del shell. Servicios, Clientes, Caja y Equipo consumen `WorkspaceSource` en `src/features/workspace/types.ts`; `local-source.ts` implementa sus operaciones en memoria. Los servicios y profesionales del espacio alimentan las opciones de Agenda. Cuando exista el contrato de NestJS se reemplazarán estos adaptadores; disponibilidad, autorización, caja definitiva y persistencia vivirán en la API.
 
 La landing pública vive en `/` y reproduce la referencia visual de `landing_page_nuari.html` con JSX y utilidades Tailwind CSS 4; no carga CDN, scripts de iconos ni datos de la API. Sus mockups, planes e importes son sólo contenido presentacional.
 

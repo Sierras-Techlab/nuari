@@ -49,4 +49,4 @@ El índice documental está en [`docs/README.md`](docs/README.md). Las instrucci
 
 ## Próximo paso
 
-Seleccionar el negocio piloto y diseñar el primer corte vertical del dominio antes de agregar autenticación, ecommerce, pagos o automatizaciones.
+Revisar el espacio Turnero (`/app`) y sus secciones de Agenda, Servicios, Clientes, Caja y Equipo con un negocio piloto concreto, confirmar el flujo manual y su métrica, y después implementar identidad, membresía y persistencia en la API para el primer corte vertical. El frontend actual usa datos locales que se reinician al recargar.

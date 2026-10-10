@@ -13,7 +13,7 @@ Las pruebas deben demostrar reglas de negocio, contratos y aislamiento entre org
 - Componentes o hooks con comportamiento relevante.
 - Adaptadores externos mediante dobles de prueba.
 
-La base inicial prueba la resolución de configuración, el cliente Axios, el contrato de health y el registro del módulo de base sin servicios externos.
+La suite actual prueba la resolución de configuración, el cliente Axios, el contrato de health, el registro del módulo de base y el comportamiento de las pantallas web, incluida la agenda demostrativa, sin servicios externos.
 
 ### Integración
 
@@ -27,7 +27,7 @@ Se incorporarán con el primer módulo de dominio usando una base aislada de des
 
 ### End-to-end
 
-Actualmente existe un smoke test HTTP de `GET /api/health`. Playwright se agregará cuando exista el primer flujo de interfaz que justifique una prueba de navegador.
+Actualmente existe un smoke test HTTP de `GET /api/health`. La agenda demostrativa se prueba con Vitest y Testing Library; aún no existe Playwright. La prueba de navegador del flujo completo se incorporará cuando la agenda se conecte a identidad y datos reales de la API.
 
 ## Multi-tenancy
 
@@ -75,9 +75,9 @@ npm audit
 npm audit --omit=dev --omit=optional
 ```
 
-## Estado de la base inicial
+## Estado actual
 
-- Frontend: 5 pruebas unitarias.
+- Frontend: 44 pruebas unitarias distribuidas en 13 archivos.
 - API: 11 pruebas unitarias distribuidas en 4 archivos.
 - API end-to-end: 1 prueba HTTP.
 - No se ejecutó una consulta real a Neon porque no se proporcionaron credenciales.

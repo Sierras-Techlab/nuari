@@ -59,6 +59,8 @@ En `app/`:
 npm run dev
 ```
 
+El frontend fija `turbopack.root` en la raíz del repositorio desde `app/next.config.ts`. Esto evita que Next infiera una raíz distinta según los lockfiles presentes y genere una carpeta `app/app/` que oculta las rutas reales de `app/src/app/`.
+
 En `api/`:
 
 ```bash
@@ -107,5 +109,6 @@ Ese árbol productivo se verifica con `npm audit --omit=dev --omit=optional`.
 
 - Si falta el cliente Prisma generado, ejecutar `npm run db:generate` desde `api/` con `DIRECT_URL` definido.
 - Si Next informa que no existe `LayoutProps`, ejecutar `npm run typecheck` desde `app/`; el script genera los tipos antes de invocar TypeScript.
+- Si Next responde 404 o `PageNotFoundError` para todas las rutas, comprobar que el servidor se inició desde `app/` y que no existe una carpeta generada `app/app/`. Detener el servidor antes de limpiar sus artefactos y reiniciarlo.
 - Si Prisma no puede conectarse, comprobar que el runtime usa la URL pooled en `DATABASE_URL` y Prisma CLI la directa en `DIRECT_URL`.
 - Si el puerto está ocupado, cambiar `PORT` en la API y mantener `NEXT_PUBLIC_API_URL` sincronizada.

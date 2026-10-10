@@ -1,16 +1,30 @@
 # Problemas conocidos y decisiones abiertas
 
-- Actualizado: 2026-08-31
+- Actualizado: 2026-10-10
 
 ## Decisiones de producto abiertas
 
 ### Negocio piloto del MVP
 
-Todavía no se seleccionó si el primer flujo real estará dirigido a una barbería/estética, un comercio de productos u otro negocio. Esta decisión debe tomarse antes de diseñar el primer módulo funcional de dominio.
+Se eligieron barberías y negocios de servicios similares como segmento inicial de exploración. Todavía falta seleccionar un negocio piloto concreto y confirmar con él si la agenda de turnos es el registro manual que conviene reemplazar primero.
 
 ### Flujo y métrica de validación
 
 El objetivo general es reemplazar un registro manual o Excel, pero todavía no se definieron el flujo exacto, el período de prueba ni la métrica cuantitativa de éxito.
+
+### Frontend sin persistencia
+
+Las rutas internas de Turnero permiten gestionar datos durante la sesión del navegador. Sus cambios se reinician al recargar y no representan turnos, movimientos de caja, clientes ni usuarios reales. A pedido de producto se quitaron los rótulos visibles de demostración; antes de usar el espacio con terceros se necesitan identidad, membresía, persistencia, autorización y validación de disponibilidad en la API.
+
+### Alcance funcional del Turnero
+
+La interfaz ya muestra Servicios, Clientes, Caja y Equipo con operaciones locales, pero sus modelos, permisos y flujos definitivos no están aprobados para el primer corte. Caja no equivale a ventas o pagos, y los integrantes de Equipo no tienen acceso real. Confirmar prioridad y reglas con el piloto según [`TASK-04`](../docs/tasks/TASK-04-turnero-workspace-front.md). La lista de espera sigue como candidata posterior. Un módulo futuro de hotelería o reservas por recursos requerirá una definición separada.
+
+Las fichas de Clientes todavía no están vinculadas por identificador a los turnos: el formulario actual toma nombre y teléfono como datos del turno. Definir esa relación con el modelo de dominio y la API antes de usar historial de clientes real.
+
+### Promesas de la landing antes del piloto
+
+La landing muestra capacidades, planes con importes concretos y un selector mensual/anual sin comportamiento. El registro y el login son sólo visuales. Antes de publicar la página como oferta comercial, alinear el mensaje, precios y llamadas a la acción con el alcance aprobado y el estado real del producto. Los textos de Términos y Política de Privacidad del formulario de registro tampoco enlazan documentos.
 
 ## Decisiones técnicas abiertas
 
@@ -34,7 +48,7 @@ Se decidió implementar autenticación propia en NestJS. La funcionalidad aún n
 
 ### Política monetaria y temporal
 
-Antes de implementar ventas o pagos se debe decidir precisión de importes, estrategia de redondeo, moneda y manejo de zona horaria de la organización.
+Antes de implementar ventas o pagos se debe decidir precisión de importes, estrategia de redondeo, moneda y manejo de zona horaria de la organización. Hoy el filtro inicial de Caja usa la fecha local del navegador y cada movimiento manual exige una fecha explícita; al conectarlo a la API, la jornada debe seguir la zona horaria definida para la organización.
 
 ### Row-Level Security
 
