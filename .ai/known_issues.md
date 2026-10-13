@@ -1,6 +1,6 @@
 # Problemas conocidos y decisiones abiertas
 
-- Actualizado: 2026-10-10
+- Actualizado: 2026-10-12
 
 ## Decisiones de producto abiertas
 
@@ -16,6 +16,8 @@ El objetivo general es reemplazar un registro manual o Excel, pero todavía no s
 
 Las rutas internas de Turnero permiten gestionar datos durante la sesión del navegador. Sus cambios se reinician al recargar y no representan turnos, movimientos de caja, clientes ni usuarios reales. A pedido de producto se quitaron los rótulos visibles de demostración; antes de usar el espacio con terceros se necesitan identidad, membresía, persistencia, autorización y validación de disponibilidad en la API.
 
+El flujo de [`TASK-05`](../docs/tasks/TASK-05-onboarding-front.md) añade navegación visual desde registro al onboarding y luego a `/app`. No crea cuenta, organización ni membresía; las selecciones del onboarding se pierden al salir/recargar y no modifican Turnero. El enlace mostrado no se reserva ni tiene ruta pública. Todas estas rutas siguen sin protección por sesión.
+
 ### Alcance funcional del Turnero
 
 La interfaz ya muestra Servicios, Clientes, Caja y Equipo con operaciones locales, pero sus modelos, permisos y flujos definitivos no están aprobados para el primer corte. Caja no equivale a ventas o pagos, y los integrantes de Equipo no tienen acceso real. Confirmar prioridad y reglas con el piloto según [`TASK-04`](../docs/tasks/TASK-04-turnero-workspace-front.md). La lista de espera sigue como candidata posterior. Un módulo futuro de hotelería o reservas por recursos requerirá una definición separada.
@@ -24,7 +26,7 @@ Las fichas de Clientes todavía no están vinculadas por identificador a los tur
 
 ### Promesas de la landing antes del piloto
 
-La landing muestra capacidades, planes con importes concretos y un selector mensual/anual sin comportamiento. El registro y el login son sólo visuales. Antes de publicar la página como oferta comercial, alinear el mensaje, precios y llamadas a la acción con el alcance aprobado y el estado real del producto. Los textos de Términos y Política de Privacidad del formulario de registro tampoco enlazan documentos.
+La landing muestra capacidades, planes con importes concretos y un selector mensual/anual sin comportamiento. Registro, login y onboarding son sólo visuales; los tipos de negocio, prestaciones y prueba de 14 días del onboarding no activan suscripciones ni aprueban nuevos módulos. Antes de publicar la página como oferta comercial, alinear el mensaje, precios y llamadas a la acción con el alcance aprobado y el estado real del producto. Los textos de Términos y Política de Privacidad del formulario de registro tampoco enlazan documentos.
 
 ## Decisiones técnicas abiertas
 
@@ -34,7 +36,7 @@ La configuración pooled/direct y la generación del cliente fueron verificadas,
 
 ### Advisory de Prisma CLI
 
-El lockfile de `api/` reporta 3 vulnerabilidades altas a través de `prisma -> @prisma/config -> deepmerge-ts`. Afectan tooling/configuración y npm sólo propone bajar a Prisma 6.12 como corrección automática, incompatible con la decisión vigente de Prisma 7. El árbol productivo excluyendo desarrollo y peers opcionales devuelve 0 vulnerabilidades con `npm audit --omit=dev --omit=optional`.
+El lockfile de `api/` reporta 4 vulnerabilidades altas de tooling (`deepmerge-ts` y `mysql2` transitivas de Prisma CLI). Afectan desarrollo/configuración y npm sólo propone bajar a Prisma 6.19.3 como corrección automática, incompatible con la decisión vigente de Prisma 7. El árbol productivo excluyendo desarrollo y peers opcionales devuelve 0 vulnerabilidades con `npm audit --omit=dev --omit=optional`.
 
 Revisar este advisory al actualizar Prisma. No usar `npm audit fix --force` sin evaluar la migración de versión mayor.
 
@@ -44,7 +46,11 @@ Se acordó desplegar NestJS como proceso o contenedor, pero no se eligió entre 
 
 ### Autenticación
 
-Se decidió implementar autenticación propia en NestJS. La funcionalidad aún no está implementada; quedan por diseñar y validar en una tarea específica los detalles de integración, configuración de cookies entre dominios, expiración y revocación de sesiones, verificación de correo, recuperación de contraseña y rate limiting. Los requisitos base están en [`ADR-005`](../docs/architecture/decisions/ADR-005-custom-authentication.md).
+El backend y el frontend de [`TASK-07`](../docs/tasks/TASK-07-feat-001-authentication-onboarding.md) implementan las fases A–D en código, pero el comportamiento persistente no está validado: migraciones, constraints, rollback y concurrencia requieren PostgreSQL aislado. También faltan Playwright E2E, revisión final de races/rate limits, correo real y validación de cookies/proxies/transporte en staging. La feature no está lista para publicación; seguir TASK-07 y no declarar FEAT-001 terminada.
+
+### Auditoría de dependencias TASK-07
+
+El 2026-10-12 `npm audit` de `app/` reportó seis vulnerabilidades, incluida una crítica en Next.js 16.3.3 (fix indicado por npm fuera de la versión fijada) y advisories altas transitivas; la actualización a Next 16.4.0 no pudo instalarse porque Windows devolvió `EBUSY` al copiar el binario SWC. `npm audit` de `api/` mantiene cuatro advisories altas en tooling Prisma 7 (`deepmerge-ts`/`mysql2`); `npm audit --omit=dev --omit=optional` sí reporta cero vulnerabilidades. No usar `npm audit fix --force` ni bajar Prisma: resolver con versiones compatibles, instalador desbloqueado y verificación de builds antes de publicar.
 
 ### Política monetaria y temporal
 

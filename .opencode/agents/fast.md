@@ -1,6 +1,6 @@
 ---
 description: Handles simple, mechanical, and low-risk development tasks.
-model: openai/gpt-5.6-luna-fast
+model: openai/gpt-6.1-luna-fast
 reasoningEffort: low
 permission:
   edit: allow

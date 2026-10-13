@@ -1,6 +1,5 @@
 import axios, { type AxiosInstance } from "axios";
 
-const DEVELOPMENT_API_URL = "http://localhost:3001/api";
 const API_TIMEOUT_MS = 10_000;
 
 type ApiEnvironment = {
@@ -13,22 +12,17 @@ export function getApiBaseUrl(
 ): string {
   const configuredUrl = env.NEXT_PUBLIC_API_URL?.trim();
 
-  if (configuredUrl) {
-    return configuredUrl.replace(/\/+$/, "");
+  if (configuredUrl && configuredUrl !== "/api") {
+    throw new Error("NEXT_PUBLIC_API_URL must be /api (same-origin).");
   }
-
-  if (env.NODE_ENV !== "production") {
-    return DEVELOPMENT_API_URL;
-  }
-
-  throw new Error(
-    "NEXT_PUBLIC_API_URL is required when the web application runs in production.",
-  );
+  return "/api";
 }
 
 export function createApiClient(baseURL = getApiBaseUrl()): AxiosInstance {
+  if (baseURL !== "/api") throw new Error("The browser API must be same-origin /api.");
   return axios.create({
     baseURL,
+    withCredentials: true,
     timeout: API_TIMEOUT_MS,
     headers: {
       Accept: "application/json",

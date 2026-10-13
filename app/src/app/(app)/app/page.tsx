@@ -6,6 +6,8 @@ import { UsersThree } from "@phosphor-icons/react/dist/ssr/UsersThree";
 import { Wallet } from "@phosphor-icons/react/dist/ssr/Wallet";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { guardPage } from "@/lib/auth/server";
+import { AccessError } from "@/features/access/access-error";
 
 const sections = [
   { href: "/app/agenda", title: "Agenda", description: "Consultá el día, registrá turnos y resolvé cambios.", icon: <CalendarDots size={22} />, tone: "mint" },
@@ -15,7 +17,10 @@ const sections = [
   { href: "/app/equipo", title: "Equipo", description: "Organizá profesionales y administración.", icon: <UsersThree size={22} />, tone: "mint" },
 ] as const;
 
-export default function InternalHomePage() {
+export default async function InternalHomePage() {
+  const snapshot = await guardPage("app");
+  if (!snapshot) return <AccessError />;
+  if (!snapshot.access?.businessAllowed) return null;
   return (
     <div className="space-y-9 pb-12">
       <div className="relative overflow-hidden rounded-[28px] border border-[#E4E9E7] bg-white p-7 shadow-[0_20px_50px_-38px_rgba(24,32,38,.24)] sm:p-10">

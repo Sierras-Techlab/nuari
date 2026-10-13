@@ -1,0 +1,30 @@
+.screen button {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.screen .back { font-weight: 500; }
+.screen .finalAction { font-size: 1rem; }
+.screen .slugInput { font-size: 0.875rem; font-weight: 500; }
+.screen .nameInput { font-size: 1.5rem; font-weight: 600; }
+
+/* The input containers supply the visible focus ring. */
+.screen .nameInput:focus-visible,
+.screen .slugInput:focus-visible { outline: none; }
+
+@media (min-width: 640px) {
+  .screen .nameInput { font-size: 1.875rem; }
+}
+
+.step {
+  animation: step-in 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes step-in {
+  from { opacity: 0; transform: translateY(30px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step { animation: none; }
+}

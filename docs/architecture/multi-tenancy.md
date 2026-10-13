@@ -15,6 +15,8 @@ Una petición autenticada identifica a un usuario. Para operar sobre una organiz
 - `membershipId`.
 - Rol o permisos efectivos.
 
+Una identidad global puede tener membresías activas en varias organizaciones y roles distintos en cada una. `OWNER`, `ADMIN` y `EMPLOYEE` son roles de la membresía, no de `User`. La organización seleccionada por sesión o indicada en una ruta es sólo una candidata hasta validar esa membresía. Una membresía no equivale a una ficha de empleado operativo (`StaffMember`).
+
 Un `organizationId` enviado por ruta, cabecera o body sólo selecciona una organización candidata. Nunca prueba que el usuario pueda acceder a ella.
 
 ## Persistencia
@@ -33,6 +35,8 @@ El aislamiento de datos y la autorización funcional son controles distintos:
 - Autorización: determina qué acciones puede ejecutar el miembro dentro de su organización.
 
 Ambos deben verificarse. Conocer el identificador de un registro no concede acceso.
+
+La política de suscripción se evalúa después de autenticar, validar el tenant y comprobar el permiso. La suscripción corresponde a `Organization`, no a cada integrante. Su vencimiento bloquea las operaciones de negocio, pero no la identidad, logout ni las funciones de consulta/regularización de esa organización. El backend evalúa las fechas; el estado o un booleano recibido del frontend no autoriza operaciones.
 
 ## Row-Level Security
 

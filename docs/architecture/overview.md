@@ -14,7 +14,7 @@ Browser
    v
 Next.js web
    |
-   | HTTPS / REST
+   | same-origin /api rewrite; HTTPS / REST
    v
 NestJS API
    |
@@ -72,7 +72,7 @@ No se creará hasta que exista una tarea concreta que lo necesite.
 
 ## Comunicación
 
-La comunicación inicial entre web y API será REST sobre HTTPS. Axios será el cliente HTTP del frontend. La instancia centralizada deberá definir URL base, timeout, serialización y traducción consistente de errores.
+La comunicación entre browser y API usa REST same-origin en `/api`; Next.js reescribe al origen server-only de NestJS según [ADR-006](decisions/ADR-006-same-origin-web-api-transport.md). Axios centraliza base, credenciales, timeout, serialización y traducción de errores. NestJS sigue siendo el dueño de autenticación y autorización conforme a [ADR-005](decisions/ADR-005-custom-authentication.md); Next no añade una API de negocio paralela.
 
 La API será la única aplicación con acceso directo a PostgreSQL. El navegador nunca recibirá credenciales de base de datos.
 

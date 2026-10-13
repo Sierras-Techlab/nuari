@@ -1,6 +1,6 @@
 ---
 description: Designs complex features and creates implementation tasks.
-model: openai/gpt-5.6-sol
+model: openai/gpt-6.1-sol
 reasoningEffort: high
 permission:
   edit: allow

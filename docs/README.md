@@ -23,6 +23,7 @@ Este directorio contiene la fuente de verdad legible para producto, arquitectura
 - [`architecture/decisions/ADR-003-tenant-isolation.md`](architecture/decisions/ADR-003-tenant-isolation.md)
 - [`architecture/decisions/ADR-004-living-documentation.md`](architecture/decisions/ADR-004-living-documentation.md)
 - [`architecture/decisions/ADR-005-custom-authentication.md`](architecture/decisions/ADR-005-custom-authentication.md)
+- [`architecture/decisions/ADR-006-same-origin-web-api-transport.md`](architecture/decisions/ADR-006-same-origin-web-api-transport.md)
 
 ## Desarrollo
 

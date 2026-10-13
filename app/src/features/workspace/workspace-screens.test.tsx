@@ -1,7 +1,12 @@
 /** @vitest-environment jsdom */
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/features/access/access-provider", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/access/access-provider")>();
+  return { ...actual, useAccess: () => ({ preflight: async () => undefined }) };
+});
 
 import { AgendaScreen } from "@/features/appointments/agenda-screen";
 import { DemoAppointmentProvider } from "@/features/appointments/demo-provider";
@@ -43,7 +48,7 @@ describe("workspace sections", () => {
 
   it("records a manual cash movement and filters the register", async () => {
     render(<WorkspaceProvider><CashScreen /></WorkspaceProvider>);
-    const filterDate = screen.getByLabelText("Fecha", { selector: "input#cash-filter-date" }) as HTMLInputElement;
+    const filterDate = await screen.findByLabelText<HTMLInputElement>("Fecha", { selector: "input#cash-filter-date" });
     await waitFor(() => expect(filterDate.value).toBeTruthy());
     fireEvent.change(filterDate, { target: { value: "2026-10-06" } });
     await screen.findByText("Insumos");

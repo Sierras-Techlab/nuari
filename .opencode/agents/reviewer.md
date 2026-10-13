@@ -1,6 +1,6 @@
 ---
 description: Reviews an implementation against its task and current git diff.
-model: openai/gpt-5.6-luna
+model: openai/gpt-6.1-luna
 reasoningEffort: high
 permission:
   edit: allow

@@ -19,7 +19,7 @@ Neon PostgreSQL: São Paulo
 
 ## Frontend
 
-Next.js se desplegará inicialmente en Vercel. La URL pública de la API se suministrará mediante configuración de ambiente y no quedará codificada en componentes.
+Next.js se desplegará inicialmente en Vercel. El navegador consume `/api` en el origen web; Next reescribe hacia Nest usando `API_INTERNAL_URL` server-only, según [ADR-006](decisions/ADR-006-same-origin-web-api-transport.md). La URL interna no se publica en componentes ni variables `NEXT_PUBLIC_*`.
 
 ## API
 
@@ -31,6 +31,8 @@ NestJS se desplegará como proceso o contenedor de larga duración. El proveedor
 - Reinicio automático.
 - Variables de ambiente administradas fuera del repositorio.
 - Estrategia de despliegue y rollback.
+
+El runtime configura `WEB_ORIGIN` exacto para CORS con credenciales, CSRF y validación de origen. El proveedor de API todavía no está decidido: documentar la topología y los proxies confiables antes de interpretar cabeceras forwarded para rate limiting.
 
 Un único VPS puede ser suficiente para validar, pero no se debe confundir separación de aplicaciones con alta disponibilidad.
 
@@ -57,6 +59,8 @@ Se mantendrán ambientes separados:
 - Producción.
 
 Cada ambiente tendrá credenciales y base o branch separados. Las migraciones se probarán fuera de producción antes de aplicarse.
+
+`API_INTERNAL_URL`, `WEB_ORIGIN`, secretos de CSRF/rate limiting y credenciales de correo son configuración independiente por ambiente; no exponer secretos al cliente ni habilitar previews no autorizados.
 
 ## Región y latencia
 

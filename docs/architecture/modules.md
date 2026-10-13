@@ -10,13 +10,13 @@ Cada módulo debe tener una responsabilidad clara, una interfaz pública y depen
 
 Responsable de organizaciones, configuración básica y ciclo de vida del tenant.
 
-Depende de identidad para asociar membresías, sin apropiarse de la autenticación.
+Posee `OrganizationMember`, roles por organización y resolución del tenant context. Depende de capacidades públicas de Identity para identificar al usuario y asociar membresías, sin apropiarse de la autenticación. Coordina la creación inicial de organización, propietario y suscripción mediante interfaces públicas y una transacción común.
 
 ### Identity and Access
 
-Responsable de usuarios, sesiones, membresías, roles y autorización.
+Responsable de usuarios, credenciales, sesiones, tokens de verificación/recuperación y autenticación. Expone identidad y capacidades de sesión; no asigna organización ni rol global. La membresía y su rol son propiedad de Organizations, en línea con ADR-005.
 
-Nuari implementará autenticación propia en NestJS. La decisión, sus límites y sus requisitos de seguridad están documentados en [`ADR-005`](decisions/ADR-005-custom-authentication.md); esta funcionalidad todavía no está implementada.
+Nuari implementa autenticación propia en NestJS conforme a [`ADR-005`](decisions/ADR-005-custom-authentication.md). La implementación actual de identidad, organizaciones y suscripciones sigue en validación y no equivale a una feature lista para publicación.
 
 ### Staff
 
@@ -80,7 +80,7 @@ Responsable de catálogo público, carrito y checkout. No forma parte automátic
 
 ## Integrations
 
-Encapsula adaptadores para proveedores externos como Mercado Pago, Resend y Cloudflare R2. Los módulos de negocio no deben depender directamente de SDKs externos; deben depender de capacidades definidas por Nuari.
+Encapsula adaptadores para proveedores externos como Mercado Pago, Resend y Cloudflare R2. Identity consume el puerto de correo definido por Nuari; el adaptador Resend sólo entrega mensajes y no valida credenciales ni tokens. Los módulos de negocio no deben depender directamente de SDKs externos; deben depender de capacidades definidas por Nuari.
 
 ## Reglas de dependencia
 

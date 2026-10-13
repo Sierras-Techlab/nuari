@@ -6,3 +6,174 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum BusinessType {
+  SERVICES
+  COMMERCE
+  HOSPITALITY
+}
+
+enum PlanCode {
+  BASIC
+  PRO
+  BUSINESS
+  TOURISM
+}
+
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  EMPLOYEE
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  EXPIRED
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+model User {
+  id                      String @id @default(uuid()) @db.Uuid
+  name                    String
+  email                   String @unique
+  emailVerifiedAt         DateTime? @db.Timestamptz(3)
+  createdAt               DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime @updatedAt @db.Timestamptz(3)
+  credential              UserCredential?
+  sessions                Session[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+  memberships             OrganizationMember[]
+  trialGrant              TrialGrant?
+  onboardingSubmissions   OnboardingSubmission[]
+}
+
+model UserCredential {
+  userId            String @id @db.Uuid
+  passwordHash      String
+  version           Int @default(1)
+  passwordChangedAt DateTime @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id                   String @id @default(uuid()) @db.Uuid
+  userId               String @db.Uuid
+  tokenHash            String @unique @db.Char(64)
+  credentialVersion    Int
+  activeOrganizationId String? @db.Uuid
+  createdAt            DateTime @db.Timestamptz(3)
+  lastSeenAt           DateTime @db.Timestamptz(3)
+  expiresAt            DateTime @db.Timestamptz(3)
+  revokedAt            DateTime? @db.Timestamptz(3)
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeOrganization   Organization? @relation(fields: [activeOrganizationId], references: [id], onDelete: SetNull)
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+model EmailVerificationToken {
+  id         String @id @default(uuid()) @db.Uuid
+  userId     String @db.Uuid
+  tokenHash  String @unique @db.Char(64)
+  createdAt  DateTime @db.Timestamptz(3)
+  expiresAt  DateTime @db.Timestamptz(3)
+  consumedAt DateTime? @db.Timestamptz(3)
+  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, consumedAt])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id         String @id @default(uuid()) @db.Uuid
+  userId     String @db.Uuid
+  tokenHash  String @unique @db.Char(64)
+  createdAt  DateTime @db.Timestamptz(3)
+  expiresAt  DateTime @db.Timestamptz(3)
+  consumedAt DateTime? @db.Timestamptz(3)
+  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, consumedAt])
+  @@index([expiresAt])
+}
+
+model RateLimitBucket {
+  scope           String
+  keyHash         String @db.Char(64)
+  windowStartedAt DateTime @db.Timestamptz(3)
+  count           Int
+  expiresAt       DateTime @db.Timestamptz(3)
+  @@id([scope, keyHash, windowStartedAt])
+  @@index([expiresAt])
+}
+
+model Organization {
+  id                    String @id @default(uuid()) @db.Uuid
+  name                  String
+  slug                  String @unique
+  businessType          BusinessType
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
+  memberships           OrganizationMember[]
+  selectedBySessions    Session[]
+  subscription          Subscription?
+  trialGrant            TrialGrant?
+  onboardingSubmission  OnboardingSubmission?
+}
+
+model OrganizationMember {
+  id             String @id @default(uuid()) @db.Uuid
+  userId         String @db.Uuid
+  organizationId String @db.Uuid
+  role           OrganizationRole
+  status         MembershipStatus
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+  user           User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@unique([userId, organizationId])
+  @@index([userId, status])
+  @@index([organizationId, status])
+}
+
+model Subscription {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @unique @db.Uuid
+  planCode       PlanCode
+  status         SubscriptionStatus
+  trialStartedAt DateTime @db.Timestamptz(3)
+  trialEndsAt    DateTime @db.Timestamptz(3)
+  paidThrough    DateTime? @db.Timestamptz(3)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([status, trialEndsAt])
+}
+
+model TrialGrant {
+  id             String @id @default(uuid()) @db.Uuid
+  userId         String @unique @db.Uuid
+  organizationId String @unique @db.Uuid
+  grantedAt      DateTime @db.Timestamptz(3)
+  user           User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+}
+
+model OnboardingSubmission {
+  id             String @id @default(uuid()) @db.Uuid
+  userId         String @db.Uuid
+  key            String @db.Uuid
+  requestHash    String @db.Char(64)
+  organizationId String @unique @db.Uuid
+  createdAt      DateTime @db.Timestamptz(3)
+  user           User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@unique([userId, key])
+}

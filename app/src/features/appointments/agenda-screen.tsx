@@ -8,18 +8,24 @@ import { Clock } from "@phosphor-icons/react/dist/csr/Clock";
 import { Plus } from "@phosphor-icons/react/dist/csr/Plus";
 import { Sparkle } from "@phosphor-icons/react/dist/csr/Sparkle";
 import { Users } from "@phosphor-icons/react/dist/csr/Users";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, LoadingState } from "@/components/states/page-states";
 import { AppointmentPanel } from "./appointment-panel";
-import { createDemoAppointmentSource, DEMO_DATE } from "./demo-source";
+import { DEMO_DATE } from "./demo-source";
 import { useDemoAppointmentSource } from "./demo-provider";
 import { AppointmentSourceError, type Appointment, type AppointmentInput, type AppointmentSetup, type AppointmentSource } from "./types";
+import { ApiError } from "@/lib/api/errors";
 
 type PanelState =
   | { mode: "new" }
   | { mode: "detail" | "reschedule" | "confirm"; id: string };
+
+function requireSource(source: AppointmentSource | null): AppointmentSource {
+  if (!source) throw new Error("Authorized appointment source is required.");
+  return source;
+}
 
 function addDays(date: string, amount: number): string {
   const parsed = new Date(date + "T12:00:00Z");
@@ -41,7 +47,8 @@ function feedbackFor(error: unknown): string {
 
 export function AgendaScreen({ source }: { source?: AppointmentSource }) {
   const sharedDemoSource = useDemoAppointmentSource();
-  const [dataSource] = useState(() => source ?? sharedDemoSource ?? createDemoAppointmentSource());
+  const dataSource = requireSource(source ?? sharedDemoSource);
+  const appointmentSource: AppointmentSource = dataSource;
   const [date, setDate] = useState(DEMO_DATE);
   const [staffFilter, setStaffFilter] = useState("");
   const [setup, setSetup] = useState<AppointmentSetup | null>(null);
@@ -53,22 +60,31 @@ export function AgendaScreen({ source }: { source?: AppointmentSource }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const contextRetries = useRef(0);
 
   useEffect(() => {
     let active = true;
-    Promise.all([dataSource.getSetup(), dataSource.list(date)]).then(([loadedSetup, loadedAppointments]) => {
+    Promise.all([appointmentSource.getSetup(), appointmentSource.list(date)]).then(([loadedSetup, loadedAppointments]) => {
       if (!active) return;
       setSetup(loadedSetup);
       setAppointments(loadedAppointments);
+      contextRetries.current = 0;
       setLoadError(null);
       setLoading(false);
     }).catch((error: unknown) => {
       if (!active) return;
+      if (error instanceof ApiError && error.code === "CONTEXT_CHANGED") {
+        if (contextRetries.current === 0) {
+          contextRetries.current = 1;
+          setRefreshKey((key) => key + 1);
+          return;
+        }
+      }
       setLoadError(feedbackFor(error));
       setLoading(false);
     });
     return () => { active = false; };
-  }, [dataSource, date, refreshKey]);
+  }, [appointmentSource, date, refreshKey]);
 
   function changeDate(nextDate: string) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(nextDate) || Number.isNaN(new Date(nextDate + "T12:00:00Z").getTime())) return;
@@ -92,7 +108,7 @@ export function AgendaScreen({ source }: { source?: AppointmentSource }) {
     setBusy(true);
     setPanelError(null);
     try {
-      await dataSource.create(input);
+      await appointmentSource.create(input);
       setPanel(null);
       setStaffFilter("");
       if (input.date !== date) changeDate(input.date);
@@ -110,7 +126,7 @@ export function AgendaScreen({ source }: { source?: AppointmentSource }) {
     setBusy(true);
     setPanelError(null);
     try {
-      await dataSource.reschedule(panel.id, slot);
+      await appointmentSource.reschedule(panel.id, slot);
       setPanel(null);
       setStaffFilter("");
       if (slot.date !== date) changeDate(slot.date);
@@ -128,7 +144,7 @@ export function AgendaScreen({ source }: { source?: AppointmentSource }) {
     setBusy(true);
     setPanelError(null);
     try {
-      await dataSource.cancel(panel.id);
+      await appointmentSource.cancel(panel.id);
       setPanel(null);
       setNotice("Turno cancelado");
       setRefreshKey((key) => key + 1);

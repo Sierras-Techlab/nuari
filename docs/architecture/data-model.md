@@ -14,6 +14,23 @@ Organization --< Customer
 - Una membresía pertenece a un único usuario y una única organización.
 - El rol y estado de acceso pertenecen a la membresía, no al usuario global.
 - Un integrante del equipo puede existir sin credenciales de acceso.
+- La membresía autenticable (`OrganizationMember`) no es el integrante operativo (`StaffMember`). Un empleado invitado puede tener acceso sin que se cree automáticamente una ficha de personal, turno u horario.
+- La sesión puede recordar una organización seleccionada, pero esa preferencia no autoriza el acceso: la API valida su membresía activa en cada operación.
+
+## Suscripción
+
+```text
+Organization --|| Subscription
+User --o| TrialGrant --|| Organization
+User --< OrganizationMember >-- Organization
+```
+
+- La suscripción pertenece a la organización y es compartida por sus miembros. El plan es `BASIC`, `PRO`, `BUSINESS` o `TOURISM`; no implica que cada prestación presentada esté implementada.
+- La primera organización creada por una persona puede recibir una única concesión de prueba de 14 días, registrada independientemente para impedir repetirla aunque una membresía se desactive.
+- `trialStartedAt` y `trialEndsAt` los establece la API al confirmar la creación. El intervalo habilitado es `[trialStartedAt, trialEndsAt)`; al instante de vencimiento exacto se deniega el acceso comercial sin eliminar datos.
+- La evaluación de plan y vigencia pertenece al backend. El cliente no puede escribir plan, estado de pago ni fechas. Identidad, sesión y consulta de regularización permanecen separadas del acceso a operaciones de negocio.
+
+Las entidades y restricciones persistentes detalladas se documentan en el esquema de Prisma y las migraciones; este modelo conceptual no reemplaza esos contratos.
 
 ## Servicios
 

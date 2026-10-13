@@ -7,34 +7,38 @@ import {
 } from "./api-client";
 
 describe("getApiBaseUrl", () => {
-  it("uses the local API during development when no URL is configured", () => {
+  it("uses the same-origin API path when no URL is configured", () => {
     expect(getApiBaseUrl({ NODE_ENV: "development" })).toBe(
-      "http://localhost:3001/api",
+      "/api",
     );
   });
 
-  it("normalizes a configured production URL", () => {
+  it("accepts the same-origin API path", () => {
     expect(
       getApiBaseUrl({
         NODE_ENV: "production",
-        NEXT_PUBLIC_API_URL: "https://api.nuari.app/api/",
+        NEXT_PUBLIC_API_URL: "/api",
       }),
-    ).toBe("https://api.nuari.app/api");
+    ).toBe("/api");
   });
 
-  it("rejects a missing production URL", () => {
-    expect(() => getApiBaseUrl({ NODE_ENV: "production" })).toThrow(
-      "NEXT_PUBLIC_API_URL",
+  it("rejects a cross-origin API URL", () => {
+    expect(() => getApiBaseUrl({
+      NODE_ENV: "production",
+      NEXT_PUBLIC_API_URL: "https://api.nuari.app/api",
+    })).toThrow(
+      "same-origin",
     );
   });
 });
 
 describe("Axios API client", () => {
   it("uses the Nuari API timeout and base URL", () => {
-    const client = createApiClient("https://api.nuari.app/api");
+    const client = createApiClient("/api");
 
-    expect(client.defaults.baseURL).toBe("https://api.nuari.app/api");
+    expect(client.defaults.baseURL).toBe("/api");
     expect(client.defaults.timeout).toBe(10_000);
+    expect(client.defaults.withCredentials).toBe(true);
   });
 
   it("reuses the lazily created client", () => {

@@ -10,9 +10,9 @@ npm ci
 npm run dev
 ```
 
-La aplicación queda disponible en `http://localhost:3000`. La variable `NEXT_PUBLIC_API_URL` es opcional en desarrollo y por defecto apunta a `http://localhost:3001/api`.
+La aplicación queda disponible en `http://localhost:3000`. En desarrollo `API_INTERNAL_URL` puede configurarse sólo en servidor y por defecto apunta a `http://localhost:3001`; el navegador consume same-origin `/api` mediante rewrite de Next.js.
 
-Las llamadas HTTP deben utilizar `src/lib/api/api-client.ts`. No colocar URLs de API directamente en componentes.
+Las llamadas HTTP del navegador deben utilizar `src/lib/api/api-client.ts` y `baseURL=/api`. Los helpers server-only pueden llamar a `API_INTERNAL_URL` reenviando exclusivamente la cookie de sesión necesaria. No colocar URLs de API directamente en componentes ni usar un origen browser cross-site.
 
 ## UI
 

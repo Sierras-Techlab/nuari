@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "rootDir": ".", "outDir": ".test-dist", "incremental": false, "declaration": false },
+  "include": ["src/**/*.ts", "test/harness.ts", "test/e2e-runner.ts"],
+  "exclude": ["node_modules", "dist", ".test-dist", "**/*spec.ts"]
+}

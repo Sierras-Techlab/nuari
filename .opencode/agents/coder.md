@@ -1,7 +1,7 @@
 ---
 description: Implements existing tasks and verifies the resulting changes.
-model: openai/gpt-5.6-luna
-reasoningEffort: medium
+model: openai/gpt-6-luna
+reasoningEffort: high
 permission:
   edit: allow
   bash: allow
