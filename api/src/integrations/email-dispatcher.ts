@@ -4,26 +4,30 @@ import { EmailSender, type EmailMessage } from './email-sender.js';
 @Injectable()
 export class EmailDispatcher implements OnModuleDestroy {
   private readonly logger = new Logger(EmailDispatcher.name);
-  private readonly queue: EmailMessage[] = [];
+  private readonly queue: Array<{ message: EmailMessage; resolve: (delivered: boolean) => void }> = [];
   private readonly pending = new Set<Promise<void>>();
   private closing = false;
 
   constructor(private readonly sender: EmailSender) {}
 
-  enqueue(message: EmailMessage): void {
+  enqueue(message: EmailMessage): Promise<boolean> {
     if (this.closing || this.queue.length + this.pending.size >= 100) {
       this.logger.warn('email_dispatch_saturated');
-      return;
+      return Promise.resolve(false);
     }
-    this.queue.push(message);
+    const delivery = new Promise<boolean>(resolve => this.queue.push({ message, resolve }));
     this.pump();
+    return delivery;
   }
 
   private pump(): void {
     while (this.pending.size < 4 && this.queue.length) {
-      const message = this.queue.shift();
-      if (!message) break;
-      const delivery = Promise.resolve().then(() => this.sender.send(message)).catch(() => {
+      const item = this.queue.shift();
+      if (!item) break;
+      const delivery = Promise.resolve().then(() => this.sender.send(item.message)).then(() => {
+        item.resolve(true);
+      }).catch(() => {
+        item.resolve(false);
         this.logger.warn('email_delivery_failed');
       }).finally(() => { this.pending.delete(delivery); this.pump(); });
       this.pending.add(delivery);

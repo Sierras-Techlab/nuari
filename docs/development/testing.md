@@ -79,6 +79,9 @@ npm audit --omit=dev --omit=optional
 
 ## Estado actual
 
+- Corrección Fase 1 (2026-10-13): las pruebas focalizadas de frontend cubren registro con sesión automática y `returnTo`, retorno después de verificar en otra pestaña, reenvío y actualización desde invitación, y recuperación de tokens inválidos; la API cubre DTOs seguros y 13 pruebas de integración de identidad contra PostgreSQL aislado. El harness capturó correos en memoria: no se enviaron correos reales ni se ejecutaron migraciones.
+- Para esta fase se ejecutaron sólo lint, typecheck y pruebas focalizadas; no se ejecutaron Playwright ni suites completas.
+
 - Frontend (2026-10-12): lint, typecheck, 126 pruebas en 24 archivos y build pasaron. Playwright no inició porque falta `TEST_DATABASE_URL`/`TEST_DIRECT_URL` aisladas.
 - API (2026-10-12): lint, typecheck, build y 57 pruebas unitarias en 11 archivos pasaron. Cuatro pruebas HTTP con servicios aislados pasaron; el resto de `test:e2e` requiere DB.
 - API `test:integration` y `test:e2e` no pudieron completar: el harness rechazó correctamente la ausencia de URLs de PostgreSQL explícitas. No se aplicaron migraciones ni se probaron garantías DB.

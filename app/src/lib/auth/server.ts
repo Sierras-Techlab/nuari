@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { isAccessSnapshot, type AccessSnapshot } from "@/lib/api/contracts";
 import { getInternalApiOrigin } from "@/lib/api/internal-origin";
+import { isSafeReturnTo } from "@/lib/navigation/return-to";
 
 export type ServerAccess = { state: "authenticated"; snapshot: AccessSnapshot } | { state: "anonymous" } | { state: "unavailable" };
 // Debe coincidir con la cookie que emite la API. Sólo el harness E2E (web en `next start`, API no productiva) usa el override; sólo se aceptan los dos nombres válidos.
@@ -40,8 +41,13 @@ export async function guardPage(mode: "auth" | "onboarding" | "app" | "business"
   if (mode === "business" && !snapshot.access?.businessAllowed) redirect("/app");
   return snapshot;
 }
-export async function guardAuthPage(): Promise<boolean> {
+export async function guardAuthPage(returnTo?: string): Promise<boolean> {
   const result = await readServerAccess();
-  if (result.state === "authenticated") redirect(result.snapshot.memberships.length ? "/app" : "/onboarding");
+  if (result.state === "authenticated") {
+    if (returnTo && isSafeReturnTo(returnTo)) {
+      redirect(returnTo);
+    }
+    redirect(result.snapshot.memberships.length ? "/app" : "/onboarding");
+  }
   return result.state !== "unavailable";
 }

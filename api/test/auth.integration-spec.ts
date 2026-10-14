@@ -7,6 +7,13 @@ import { PrismaService } from '../src/database/prisma.service.js';
 import { SecurityConfig } from '../src/common/security.config.js';
 import { SESSION_IDLE_MS, SESSION_ABSOLUTE_MS } from '../src/identity/session-policy.js';
 import { sha256 } from '../src/common/crypto.js';
+import { EmailDispatcher } from '../src/integrations/email-dispatcher.js';
+import { EmailSender, type EmailMessage } from '../src/integrations/email-sender.js';
+import request from 'supertest';
+
+class FailingEmailSender extends EmailSender {
+  async send(_message: EmailMessage): Promise<void> { throw new Error('test delivery failure'); }
+}
 import * as argon2 from 'argon2';
 
 describe('identity against isolated PostgreSQL', () => {
@@ -34,6 +41,30 @@ describe('identity against isolated PostgreSQL', () => {
     const original = user.credential?.passwordHash;
     await h.identity.register({ ...input, password: 'different duplicate password' });
     expect((await h.db.userCredential.findUniqueOrThrow({ where: { userId: user.id } })).passwordHash).toBe(original);
+  });
+
+  it('persists member revocation, excludes it from active lists, and denies tenant endpoints without ending the session', async () => {
+    const owner = await h.user();
+    const employee = await h.user();
+    const created = await h.organizations.createInitial(owner.principal, randomUUID(), { name: 'Revocation test', slug: `revoke-${randomUUID().slice(0, 8)}`, businessType: 'SERVICES', planCode: 'BASIC' });
+    h.ownedOrganizations.add(created.organization.id);
+    const employeeMembership = await h.db.organizationMember.create({ data: { userId: employee.id, organizationId: created.organization.id, role: 'EMPLOYEE', status: 'ACTIVE' } });
+    const ownerMembership = await h.db.organizationMember.findUniqueOrThrow({ where: { id: created.membership.id } });
+
+    await h.organizations.removeMember(ownerMembership, owner.id, employeeMembership.id);
+
+    await expect(h.db.organizationMember.findUniqueOrThrow({ where: { id: employeeMembership.id } })).resolves.toMatchObject({ status: 'INACTIVE' });
+    await expect(h.organizations.listMembers(created.organization.id)).resolves.toEqual(expect.not.arrayContaining([expect.objectContaining({ id: employeeMembership.id })]));
+    const session = await h.db.session.findUniqueOrThrow({ where: { id: employee.principal.sessionId } });
+    expect(session.revokedAt).toBeNull();
+    const snapshot = await h.organizations.snapshot(employee.principal);
+    expect(snapshot).toMatchObject({ memberships: [], activeOrganizationId: null, onboarding: { reason: 'ACCESS_REVOKED' } });
+
+    const response = await request(h.app.getHttpServer())
+      .get(`/api/organizations/${created.organization.id}/members`)
+      .set('Cookie', `${h.app.get(SecurityConfig).sessionCookie}=${employee.token}`);
+    expect(response.status).toBe(404);
+    expect(response.body).toMatchObject({ code: 'ORGANIZATION_NOT_FOUND' });
   });
 
   it('uses opaque session tokens, rotates identity, and does not extend absolute expiry', async () => {
@@ -81,9 +112,38 @@ describe('identity against isolated PostgreSQL', () => {
     const token = h.emailSender.token(user.email, 'verify-email');
     await expect(h.identity.confirmPasswordReset(token, 'replacement password')).rejects.toMatchObject({ status: 400 });
     const results = await Promise.allSettled([h.identity.confirmVerification(token), secondIdentity.confirmVerification(token)]);
-    expect(results.filter(item => item.status === 'fulfilled')).toHaveLength(1);
-    expect(results.filter(item => item.status === 'rejected')).toHaveLength(1);
+    expect(results.filter(item => item.status === 'fulfilled')).toHaveLength(2);
     expect((await h.db.user.findUniqueOrThrow({ where: { id: user.id } })).emailVerifiedAt).not.toBeNull();
+  });
+
+  it('treats a repeated confirmation by the already verified account as idempotent', async () => {
+    const user = await h.user({ verified: false });
+    const token = h.emailSender.token(user.email, 'verify-email');
+
+    await h.identity.confirmVerification(token);
+    await expect(h.identity.confirmVerification(token)).resolves.toBeUndefined();
+  });
+
+  it('keeps the previous verification token when a resend cannot be delivered', async () => {
+    const user = await h.user({ verified: false });
+    const oldToken = h.emailSender.token(user.email, 'verify-email');
+    const failingDispatcher = new EmailDispatcher(new FailingEmailSender());
+    const failingIdentity = new IdentityService(secondDb, h.app.get(PasswordHasher), h.clock, failingDispatcher, h.app.get(SecurityConfig));
+
+    await failingIdentity.requestVerification(user.id);
+    await failingDispatcher.drain();
+    await expect(h.identity.confirmVerification(oldToken)).resolves.toBeUndefined();
+  });
+
+  it('includes a validated invitation return path in verification email links', async () => {
+    const email = `${randomUUID()}@example.test`;
+    await h.identity.register({ name: 'Invited User', email, password: 'long unchanged password', returnTo: '/invitacion/invitation-token-123456789' });
+    const user = await h.db.user.findUniqueOrThrow({ where: { email } });
+    h.ownedUsers.add(user.id);
+    await h.dispatcher.drain();
+
+    const message = h.emailSender.messages.find(item => item.to === email);
+    expect(message && new URL(message.text).searchParams.get('returnTo')).toBe('/invitacion/invitation-token-123456789');
   });
 
   it('serializes resends and invalidates old verification tokens', async () => {
@@ -91,7 +151,8 @@ describe('identity against isolated PostgreSQL', () => {
     const old = h.emailSender.token(user.email, 'verify-email');
     await Promise.all([h.identity.requestVerification(user.id), secondIdentity.requestVerification(user.id)]);
     await h.dispatcher.drain();
-    expect(await h.db.emailVerificationToken.count({ where: { userId: user.id, consumedAt: null } })).toBe(1);
+    const activeTokens = await h.db.emailVerificationToken.findMany({ where: { userId: user.id, consumedAt: null }, select: { id: true, tokenHash: true } });
+    expect(activeTokens).toHaveLength(1);
     await expect(h.identity.confirmVerification(old)).rejects.toMatchObject({ status: 400 });
     const active = await h.db.emailVerificationToken.findFirstOrThrow({ where: { userId: user.id, consumedAt: null } });
     const sent = h.emailSender.messages.filter(message => message.to === user.email).map(message => new URL(message.text).hash.slice(7)).find(token => sha256(token) === active.tokenHash);

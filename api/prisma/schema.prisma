@@ -53,6 +53,8 @@ model User {
   memberships             OrganizationMember[]
   trialGrant              TrialGrant?
   onboardingSubmissions   OnboardingSubmission[]
+  sentInvitations         OrganizationInvitation[] @relation("InvitedByUser")
+  auditLogs               OrganizationAuditLog[]
 }
 
 model UserCredential {
@@ -119,6 +121,18 @@ model Organization {
   name                  String
   slug                  String @unique
   businessType          BusinessType
+  description           String?
+  email                 String?
+  phone                 String?
+  website               String?
+  country               String?
+  state                 String?
+  city                  String?
+  zip                   String?
+  address               String?
+  timezone              String @default("America/Argentina/Buenos_Aires")
+  currency              String @default("ARS")
+  logoUrl               String?
   createdAt             DateTime @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime @updatedAt @db.Timestamptz(3)
   memberships           OrganizationMember[]
@@ -126,6 +140,8 @@ model Organization {
   subscription          Subscription?
   trialGrant            TrialGrant?
   onboardingSubmission  OnboardingSubmission?
+  invitations           OrganizationInvitation[]
+  auditLogs             OrganizationAuditLog[]
 }
 
 model OrganizationMember {
@@ -176,4 +192,34 @@ model OnboardingSubmission {
   user           User @relation(fields: [userId], references: [id], onDelete: Restrict)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   @@unique([userId, key])
+}
+
+model OrganizationInvitation {
+  id              String           @id @default(uuid()) @db.Uuid
+  organizationId  String           @db.Uuid
+  email           String
+  role            OrganizationRole
+  tokenHash       String           @unique @db.Char(64)
+  invitedByUserId String           @db.Uuid
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
+  expiresAt       DateTime         @db.Timestamptz(3)
+  acceptedAt      DateTime?        @db.Timestamptz(3)
+  revokedAt       DateTime?        @db.Timestamptz(3)
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedByUser   User             @relation("InvitedByUser", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+  @@index([organizationId, email])
+  @@index([expiresAt])
+}
+
+model OrganizationAuditLog {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  actorUserId    String       @db.Uuid
+  action         String
+  targetId       String?
+  metadata       String?
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorUser      User         @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  @@index([organizationId, createdAt])
 }

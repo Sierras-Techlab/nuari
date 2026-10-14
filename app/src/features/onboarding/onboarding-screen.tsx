@@ -43,6 +43,7 @@ export function OnboardingScreen() {
   const [pending, setPending] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [showCreateAfterRevocation, setShowCreateAfterRevocation] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | undefined>();
   const attempt = useRef<OnboardingAttempt | null>(null);
   const [step, setStep] = useState<OnboardingStep>(1);
@@ -129,6 +130,27 @@ export function OnboardingScreen() {
   }
 
   if (!snapshot) return <main className="min-h-screen bg-[#F8FAF9] p-8"><p role="status">{accessError ?? "Comprobando tu acceso…"}</p><button type="button" onClick={() => void refresh()}>Reintentar</button></main>;
+  if (snapshot.onboarding.reason === "ACCESS_REVOKED" && !showCreateAfterRevocation) {
+    return (
+      <main className="min-h-screen bg-[#F8FAF9] p-8">
+        <AccountControls />
+        <section className="mx-auto mt-16 max-w-xl rounded-3xl border border-[#E4E9E7] bg-white p-8 shadow-sm">
+          <h1 className="text-3xl font-bold">Ya no tenés acceso a esta organización</h1>
+          <p className="mt-4 text-[#667078]">Tu cuenta sigue activa, pero ya no forma parte de ninguna organización disponible.</p>
+          {snapshot.onboarding.canCreateOrganization ? (
+            <button type="button" onClick={() => setShowCreateAfterRevocation(true)} className="mt-6 min-h-11 rounded-xl bg-[#182026] px-5 py-3 text-sm font-semibold text-white">
+              Crear una organización nueva
+            </button>
+          ) : (
+            <p className="mt-6 text-sm text-[#667078]">
+              Si necesitás recuperar el acceso, pedile al propietario que te invite nuevamente o contactanos en{" "}
+              <a className="font-semibold underline" href="mailto:hola@nuari.app">hola@nuari.app</a>.
+            </p>
+          )}
+        </section>
+      </main>
+    );
+  }
   if (snapshot.onboarding.reason === "TRIAL_ALREADY_USED") return <main className="min-h-screen bg-[#F8FAF9] p-8"><AccountControls /><h1 className="mt-8 text-3xl font-bold">Tu prueba ya fue utilizada</h1><p className="mt-4">Contactanos en <a href="mailto:hola@nuari.app">hola@nuari.app</a> para obtener ayuda.</p></main>;
   return (
     <div className={`${styles.screen} flex min-h-dvh flex-col bg-[#F8FAF9] text-[#182026] antialiased selection:bg-[#DDF6E8] selection:text-[#182026]`} onKeyDown={handleEnter}>

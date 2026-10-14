@@ -202,4 +202,24 @@ describe("onboarding", () => {
     expect(screen.getByRole("button", { name: "Cerrar sesión" })).toBeTruthy();
     expect(screen.queryByLabelText("Nombre del negocio")).toBeNull();
   });
+
+  it("explains revoked access and offers organization creation only when eligible", () => {
+    const snapshot = accessFixture(false);
+    snapshot.onboarding = { canCreateOrganization: false, reason: "ACCESS_REVOKED" };
+    context.snapshot = snapshot;
+    render(<OnboardingScreen />);
+    expect(screen.getByRole("heading", { name: "Ya no tenés acceso a esta organización" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cerrar sesión" })).toBeTruthy();
+    expect(screen.queryByLabelText("Nombre del negocio")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Crear una organización nueva" })).toBeNull();
+  });
+
+  it("offers creating a new organization as a secondary action when a revoked account is eligible", () => {
+    const snapshot = accessFixture(false);
+    snapshot.onboarding = { canCreateOrganization: true, reason: "ACCESS_REVOKED" };
+    context.snapshot = snapshot;
+    render(<OnboardingScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "Crear una organización nueva" }));
+    expect(screen.getByLabelText("Nombre del negocio")).toBeTruthy();
+  });
 });

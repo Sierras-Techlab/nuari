@@ -3,27 +3,70 @@ import { OrganizationsService, onboardingRequestHash } from './organizations.ser
 import type { CreateOrganizationDto } from './organizations.dto.js';
 
 const now = new Date('2026-10-12T12:00:00.000Z');
-const org = { id: 'org-id', name: 'Mi negocio', slug: 'mi-negocio', businessType: 'SERVICES' as const, createdAt: now, updatedAt: now };
+const org = {
+  id: 'org-id',
+  name: 'Mi negocio',
+  slug: 'mi-negocio',
+  businessType: 'SERVICES' as const,
+  description: null,
+  email: null,
+  phone: null,
+  website: null,
+  country: 'AR',
+  state: null,
+  city: null,
+  zip: null,
+  address: null,
+  timezone: 'America/Argentina/Buenos_Aires',
+  currency: 'ARS',
+  logoUrl: null,
+  createdAt: now,
+  updatedAt: now,
+};
 const member = { id: 'member-id', userId: 'user-id', organizationId: org.id, role: 'OWNER' as const, status: 'ACTIVE' as const, createdAt: now, updatedAt: now, organization: org };
 const input: CreateOrganizationDto = { name: org.name, slug: org.slug, businessType: 'SERVICES', planCode: 'BASIC' };
 const principal = { userId: 'user-id', sessionId: 'session-id', activeOrganizationId: null };
 
-function setup(overrides: { existing?: object | null; members?: object[]; grant?: boolean; verified?: boolean } = {}) {
+function setup(overrides: { existing?: object | null; members?: object[]; grant?: boolean; verified?: boolean; inactiveMembership?: object | null } = {}) {
   const user = { id: 'user-id', name: 'A User', email: 'a@example.test', emailVerifiedAt: overrides.verified === false ? null : now, createdAt: now, updatedAt: now };
   const tx = {
     $queryRaw: vi.fn().mockResolvedValue([{ id: user.id }]),
     user: { findUnique: vi.fn().mockResolvedValue(user) },
     session: { findUnique: vi.fn().mockResolvedValue({ id: 'session-id', userId: user.id, activeOrganizationId: null, revokedAt: null, credentialVersion: 1, expiresAt: new Date(now.getTime() + 60_000), lastSeenAt: now, user: { credential: { version: 1 } } }), update: vi.fn().mockResolvedValue({}) },
-    organizationMember: { findMany: vi.fn().mockResolvedValue(overrides.members ?? []), findFirst: vi.fn().mockResolvedValue(member), create: vi.fn().mockResolvedValue(member) },
+    organizationMember: {
+      findMany: vi.fn().mockResolvedValue(overrides.members ?? []),
+      findFirst: vi.fn().mockImplementation(({ where }: { where?: { status?: string } } = {}) => Promise.resolve(where?.status === 'INACTIVE' ? overrides.inactiveMembership ?? null : member)),
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue(member),
+      update: vi.fn().mockResolvedValue(member),
+      count: vi.fn().mockResolvedValue(1),
+    },
+    organizationInvitation: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockResolvedValue({}),
+      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     onboardingSubmission: { findUnique: vi.fn().mockResolvedValue(overrides.existing ?? null), create: vi.fn().mockResolvedValue({}) },
-    organization: { create: vi.fn().mockResolvedValue(org) },
+    organization: { create: vi.fn().mockResolvedValue(org), update: vi.fn().mockResolvedValue(org) },
+    organizationAuditLog: { create: vi.fn().mockResolvedValue({}) },
   };
-  const db = { $transaction: vi.fn((callback: (context: typeof tx) => unknown) => callback(tx)) };
+  const db = {
+    $transaction: vi.fn((callback: (context: typeof tx) => unknown) => callback(tx)),
+    organizationMember: tx.organizationMember,
+    organizationInvitation: tx.organizationInvitation,
+  };
+
+
   const identity = { lockUser: vi.fn().mockResolvedValue(user), assertSession: vi.fn().mockResolvedValue(undefined), selectOrganization: vi.fn().mockResolvedValue(undefined) };
   const subscriptions = { hasTrialGrant: vi.fn().mockResolvedValue(overrides.grant ?? false), createTrial: vi.fn().mockResolvedValue(undefined), state: vi.fn().mockResolvedValue({ subscription: { id: 'sub-id' }, access: { businessAllowed: true } }) };
   const clock = { now: vi.fn().mockReturnValue(now) };
-  return { service: new OrganizationsService(db as never, identity as never, subscriptions as never, clock as never), tx, db, identity, subscriptions, clock };
+  const emails = { enqueue: vi.fn() };
+
+  return { service: new OrganizationsService(db as never, identity as never, subscriptions as never, clock as never, emails as never), tx, db, identity, subscriptions, clock, emails };
 }
+
 
 describe('OrganizationsService initial onboarding', () => {
   it('hashes the canonical validated request and atomically creates OWNER, trial, result, and session selection', async () => {
@@ -62,6 +105,23 @@ describe('OrganizationsService initial onboarding', () => {
     await expect(eligible.service.snapshot(principal)).resolves.toMatchObject({ onboarding: { canCreateOrganization: true, reason: 'ELIGIBLE' } });
   });
 
+  it('reports revoked access when no active memberships remain and preserves create eligibility separately', async () => {
+    const inactive = { ...member, status: 'INACTIVE' as const };
+    const { service, identity } = setup({ inactiveMembership: inactive });
+    const snapshot = await service.snapshot(principal);
+    expect(snapshot).toMatchObject({ memberships: [], activeOrganizationId: null, access: null, onboarding: { reason: 'ACCESS_REVOKED', canCreateOrganization: true } });
+    expect(identity.selectOrganization).toHaveBeenCalledWith(expect.anything(), principal, null);
+  });
+
+  it('selects another active organization when the session organization has been revoked', async () => {
+    const otherOrganization = { ...org, id: 'org-other', slug: 'otro-negocio' };
+    const otherMember = { ...member, id: 'member-other', organizationId: otherOrganization.id, role: 'EMPLOYEE' as const, organization: otherOrganization };
+    const { service, tx, identity } = setup({ members: [otherMember] });
+    const snapshot = await service.snapshot({ ...principal, activeOrganizationId: org.id });
+    expect(snapshot).toMatchObject({ memberships: [{ organization: { id: otherOrganization.id } }], activeOrganizationId: otherOrganization.id });
+    expect(identity.selectOrganization).toHaveBeenCalledWith(tx, { ...principal, activeOrganizationId: org.id }, otherOrganization.id);
+  });
+
   it('replays a matching idempotency key without creating another organization', async () => {
     const { service, tx } = setup({ existing: { userId: 'user-id', key: 'key', requestHash: onboardingRequestHash(input), organizationId: org.id } });
     const result = await service.createInitial(principal, 'key', input);
@@ -84,3 +144,285 @@ describe('OrganizationsService initial onboarding', () => {
     await expect(unverified.service.createInitial(principal, 'key', input)).rejects.toMatchObject({ status: 403, response: { code: 'EMAIL_UNVERIFIED' } });
   });
 });
+
+describe('OrganizationsService updateSettings', () => {
+  it('allows OWNER to update commercial settings, slug, and records audit log', async () => {
+    const { service, tx } = setup();
+    tx.organization.update = vi.fn().mockResolvedValue({
+      ...org,
+      name: 'Nuevo Nombre',
+      slug: 'nuevo-slug',
+      country: 'AR',
+      timezone: 'America/Argentina/Buenos_Aires',
+      currency: 'ARS',
+      phone: '+5491122334455',
+    });
+    tx.organizationAuditLog = { create: vi.fn().mockResolvedValue({}) };
+
+    const result = await service.updateSettings(
+      member,
+      'user-id',
+      { name: 'Nuevo Nombre', slug: 'nuevo-slug', country: 'AR', phone: '+5491122334455' },
+    );
+
+    expect(tx.organization.update).toHaveBeenCalledWith({
+      where: { id: org.id },
+      data: expect.objectContaining({
+        name: 'Nuevo Nombre',
+        slug: 'nuevo-slug',
+        country: 'AR',
+        phone: '+5491122334455',
+      }),
+    });
+    expect(tx.organizationAuditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: org.id,
+        actorUserId: 'user-id',
+        action: 'ORGANIZATION_SETTINGS_UPDATED',
+        targetId: org.id,
+      }),
+    });
+    expect(result.name).toBe('Nuevo Nombre');
+    expect(result.slug).toBe('nuevo-slug');
+  });
+
+  it('allows ADMIN to update commercial fields but rejects changing slug', async () => {
+    const { service } = setup();
+    const adminMember = { ...member, role: 'ADMIN' as const };
+
+    await expect(
+      service.updateSettings(adminMember, 'user-id', { slug: 'slug-cambiado' }),
+    ).rejects.toMatchObject({
+      status: 403,
+      response: { code: 'PERMISSION_DENIED' },
+    });
+  });
+
+  it('rejects EMPLOYEE from updating any organization settings', async () => {
+    const { service } = setup();
+    const employeeMember = { ...member, role: 'EMPLOYEE' as const };
+
+    await expect(
+      service.updateSettings(employeeMember, 'user-id', { name: 'Intento Empleado' }),
+    ).rejects.toMatchObject({
+      status: 403,
+      response: { code: 'PERMISSION_DENIED' },
+    });
+  });
+
+  it('validates country, currency correspondence, and timezone', async () => {
+    const { service } = setup();
+
+    // Invalid country
+    await expect(
+      service.updateSettings(member, 'user-id', { country: 'US' }),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'VALIDATION_ERROR' },
+    });
+
+    // Mismatched currency for Chile (CLP expected, ARS passed)
+    await expect(
+      service.updateSettings(member, 'user-id', { country: 'CL', currency: 'ARS' }),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'VALIDATION_ERROR' },
+    });
+
+    // Invalid timezone for Uruguay
+    await expect(
+      service.updateSettings(member, 'user-id', { country: 'UY', currency: 'UYU', timezone: 'America/Argentina/Buenos_Aires' }),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'VALIDATION_ERROR' },
+    });
+  });
+
+  it('maps empty strings to null when clearing optional fields, and allows null/empty/existing logoUrl', async () => {
+    const { service, tx } = setup();
+
+    await service.updateSettings(member, 'user-id', {
+      email: '',
+      phone: '',
+      website: '',
+      description: '',
+      state: '',
+      city: '',
+      zip: '',
+      address: '',
+      logoUrl: '',
+    });
+
+    expect(tx.organization.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          email: null,
+          phone: null,
+          website: null,
+          description: null,
+          state: null,
+          city: null,
+          zip: null,
+          address: null,
+          logoUrl: null,
+        }),
+      }),
+    );
+  });
+});
+
+describe('OrganizationsService member and invitation management', () => {
+  it('lists active members only', async () => {
+    const { service, db } = setup();
+    db.organizationMember.findMany = vi.fn().mockResolvedValue([]);
+    await service.listMembers(org.id);
+    expect(db.organizationMember.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId: org.id, status: 'ACTIVE' } }));
+  });
+
+  it('persists revocation as INACTIVE and retains the member record', async () => {
+    const { service, tx } = setup();
+    const target = { ...member, id: 'employee-id', role: 'EMPLOYEE' as const, user: { id: 'employee-user', name: 'Empleado', email: 'employee@example.test' } };
+    const inactive = { ...target, status: 'INACTIVE' as const };
+    tx.organizationMember.findFirst = vi.fn().mockResolvedValue(target);
+    tx.organizationMember.update = vi.fn().mockResolvedValue(inactive);
+    await expect(service.removeMember(member, 'owner-user', target.id)).resolves.toMatchObject({ id: target.id, status: 'INACTIVE' });
+    expect(tx.organizationMember.update).toHaveBeenCalledWith({ where: { id: target.id }, data: { status: 'INACTIVE', updatedAt: now }, include: { user: { select: { id: true, name: true, email: true } } } });
+  });
+
+  it('resolves tenant membership only while active', async () => {
+    const { service, db } = setup();
+    db.organizationMember.findFirst = vi.fn().mockResolvedValue(null);
+    await expect(service.resolveMember('revoked-user', org.id)).rejects.toMatchObject({ status: 404, response: { code: 'ORGANIZATION_NOT_FOUND' } });
+    expect(db.organizationMember.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'revoked-user', organizationId: org.id, status: 'ACTIVE' } }));
+  });
+
+  it('prevents removing or degrading the last OWNER', async () => {
+    const { service, tx } = setup();
+    tx.organizationMember.findFirst = vi.fn().mockResolvedValue(member);
+    tx.organizationMember.count = vi.fn().mockResolvedValue(1);
+
+    await expect(
+      service.updateMemberRole(member, 'user-id', member.id, { role: 'ADMIN' }),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'CANNOT_REMOVE_LAST_OWNER' },
+    });
+
+    await expect(
+      service.removeMember(member, 'user-id', member.id),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'CANNOT_REMOVE_LAST_OWNER' },
+    });
+  });
+
+  it('restricts ADMIN to only modifying and revoking EMPLOYEE', async () => {
+    const { service, tx } = setup();
+    const admin = { ...member, id: 'admin-id', role: 'ADMIN' as const };
+    const otherAdmin = { ...member, id: 'other-admin-id', role: 'ADMIN' as const };
+    tx.organizationMember.findFirst = vi.fn().mockResolvedValue(otherAdmin);
+
+    await expect(
+      service.updateMemberRole(admin, 'user-id', otherAdmin.id, { role: 'EMPLOYEE' }),
+    ).rejects.toMatchObject({
+      status: 403,
+      response: { code: 'PERMISSION_DENIED' },
+    });
+
+    await expect(
+      service.removeMember(admin, 'user-id', otherAdmin.id),
+    ).rejects.toMatchObject({
+      status: 403,
+      response: { code: 'PERMISSION_DENIED' },
+    });
+  });
+
+  it('creates an invitation, hashes token and enqueues email via Resend', async () => {
+    const { service, tx, emails } = setup();
+    tx.organizationMember.findFirst = vi.fn().mockResolvedValue(null);
+    tx.organizationInvitation.updateMany = vi.fn().mockResolvedValue({ count: 0 });
+    tx.organizationInvitation.create = vi.fn().mockResolvedValue({
+      id: 'inv-id',
+      organizationId: org.id,
+      email: 'nuevo@example.test',
+      role: 'EMPLOYEE',
+      tokenHash: 'somehash',
+      createdAt: now,
+      expiresAt: new Date(now.getTime() + 7 * 86400000),
+      acceptedAt: null,
+      revokedAt: null,
+    });
+
+    const res = await service.createInvitation(member, 'user-id', {
+      email: 'nuevo@example.test',
+      role: 'EMPLOYEE',
+    });
+
+    expect(res.token).toBeDefined();
+    expect(res.invitation.email).toBe('nuevo@example.test');
+    expect(emails.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+      to: 'nuevo@example.test',
+      subject: expect.stringContaining(org.name),
+    }));
+  });
+
+  it('accepts an invitation with verified matching email and assigns organization', async () => {
+    const { service, tx, identity } = setup({ verified: true });
+    const token = 'test-token-value-12345678901234567890';
+    const inv = {
+      id: 'inv-id',
+      organizationId: org.id,
+      email: 'a@example.test',
+      role: 'EMPLOYEE' as const,
+      organization: org,
+      expiresAt: new Date(now.getTime() + 86400000),
+      revokedAt: null,
+      acceptedAt: null,
+    };
+    tx.organizationInvitation.findUnique = vi.fn().mockResolvedValue(inv);
+    tx.organizationInvitation.update = vi.fn().mockResolvedValue({ ...inv, acceptedAt: now });
+    tx.organizationMember.findUnique = vi.fn().mockResolvedValue(null);
+    tx.organizationMember.create = vi.fn().mockResolvedValue({
+      id: 'new-mem-id',
+      userId: 'user-id',
+      organizationId: org.id,
+      role: 'EMPLOYEE',
+      status: 'ACTIVE',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const result = await service.acceptInvitation(token, principal);
+    expect(result.membership.role).toBe('EMPLOYEE');
+    expect(tx.organizationInvitation.update).toHaveBeenCalledWith({
+      where: { id: inv.id },
+      data: { acceptedAt: now },
+    });
+    expect(identity.selectOrganization).toHaveBeenCalledWith(tx, principal, org.id);
+  });
+
+  it('rejects invitation if email does not match or is unverified', async () => {
+    const { service, tx } = setup({ verified: true });
+    const inv = {
+      id: 'inv-id',
+      organizationId: org.id,
+      email: 'otro-correo@example.test',
+      role: 'EMPLOYEE' as const,
+      organization: org,
+      expiresAt: new Date(now.getTime() + 86400000),
+      revokedAt: null,
+      acceptedAt: null,
+    };
+    tx.organizationInvitation.findUnique = vi.fn().mockResolvedValue(inv);
+
+    await expect(
+      service.acceptInvitation('any-token', principal),
+    ).rejects.toMatchObject({
+      status: 403,
+      response: { code: 'EMAIL_MISMATCH' },
+
+    });
+  });
+});
+
+

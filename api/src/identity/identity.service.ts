@@ -8,7 +8,7 @@ import type { SessionPrincipal } from '../common/request.js';
 import { SecurityConfig } from '../common/security.config.js';
 import { EmailDispatcher } from '../integrations/email-dispatcher.js';
 import { PasswordHasher } from './password-hasher.js';
-import type { RegisterDto } from './identity.dto.js';
+import { isSafeReturnTo, type RegisterDto } from './identity.dto.js';
 import { SESSION_ABSOLUTE_MS, SESSION_IDLE_MS, sessionValid } from './session-policy.js';
 import type { User } from '../generated/prisma/client.js';
 
@@ -27,24 +27,32 @@ export class IdentityService {
     return user;
   }
 
-  private async createToken(tx: TransactionContext, userId: string, purpose: TokenPurpose, now: Date): Promise<string> {
+  private async createToken(tx: TransactionContext, userId: string, purpose: TokenPurpose, now: Date, revokeExisting = true): Promise<{ token: string; id: string }> {
     const token = randomToken();
     const data = { userId, tokenHash: sha256(token), createdAt: now, expiresAt: new Date(now.getTime() + (purpose === 'verification' ? 86_400_000 : 1_800_000)) };
     if (purpose === 'verification') {
-      await tx.emailVerificationToken.updateMany({ where: { userId, consumedAt: null }, data: { consumedAt: now } });
-      await tx.emailVerificationToken.create({ data });
+      if (revokeExisting) await tx.emailVerificationToken.updateMany({ where: { userId, consumedAt: null }, data: { consumedAt: now } });
+      const created = await tx.emailVerificationToken.create({ data });
+      return { token, id: created.id };
     } else {
       await tx.passwordResetToken.updateMany({ where: { userId, consumedAt: null }, data: { consumedAt: now } });
-      await tx.passwordResetToken.create({ data });
+      const created = await tx.passwordResetToken.create({ data });
+      return { token, id: created.id };
     }
-    return token;
   }
 
-  private send(email: string, token: string, purpose: TokenPurpose): void {
-    this.dispatcher.enqueue({ to: email, subject: purpose === 'verification' ? 'Verificá tu correo en Nuari' : 'Restablecé tu contraseña de Nuari', text: `${this.config.webOrigin}/${purpose === 'verification' ? 'verify-email' : 'reset-password'}#token=${token}` });
+  private validateReturnTo(returnTo?: string): string | undefined {
+    if (returnTo !== undefined && !isSafeReturnTo(returnTo)) throw new ApiError(400, 'VALIDATION_ERROR', 'La ruta de retorno no es válida.');
+    return returnTo;
+  }
+
+  private send(email: string, token: string, purpose: TokenPurpose, returnTo?: string): Promise<boolean> {
+    const query = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : '';
+    return this.dispatcher.enqueue({ to: email, subject: purpose === 'verification' ? 'Verificá tu correo en Nuari' : 'Restablecé tu contraseña de Nuari', text: `${this.config.webOrigin}/${purpose === 'verification' ? 'verify-email' : 'reset-password'}${query}#token=${token}` });
   }
 
   async register(input: RegisterDto): Promise<void> {
+    const returnTo = this.validateReturnTo(input.returnTo);
     // Both duplicate and new registrations pay the same password-hashing cost.
     const passwordHash = await this.hasher.hash(input.password);
     const result = await this.db.$transaction(async tx => {
@@ -56,9 +64,9 @@ export class IdentityService {
       if (!rows[0]) return null;
       const userId = rows[0].id;
       await tx.userCredential.create({ data: { userId, passwordHash, passwordChangedAt: now, updatedAt: now } });
-      return { token: await this.createToken(tx, userId, 'verification', now) };
+      return { token: (await this.createToken(tx, userId, 'verification', now)).token };
     });
-    if (result) this.send(input.email, result.token, 'verification');
+    if (result) void this.send(input.email, result.token, 'verification', returnTo);
   }
 
   async login(email: string, password: string, presentedToken?: string) {
@@ -120,13 +128,27 @@ export class IdentityService {
     }
   }
 
-  async requestVerification(userId: string): Promise<void> {
+  async requestVerification(userId: string, requestedReturnTo?: string): Promise<void> {
+    const returnTo = this.validateReturnTo(requestedReturnTo);
     const result = await this.db.$transaction(async tx => {
       const user = await this.lockUser(tx, userId);
       if (user.emailVerifiedAt) return null;
-      return { email: user.email, token: await this.createToken(tx, userId, 'verification', this.clock.now()) };
+      const created = await this.createToken(tx, userId, 'verification', this.clock.now(), false);
+      return { email: user.email, token: created.token, tokenId: created.id };
     });
-    if (result) this.send(result.email, result.token, 'verification');
+    if (!result || !(await this.send(result.email, result.token, 'verification', returnTo))) return;
+    await this.db.$transaction(async tx => {
+      const user = await this.lockUser(tx, userId);
+      if (user.emailVerifiedAt) return;
+      const now = this.clock.now();
+      const latest = await tx.emailVerificationToken.findFirst({
+        where: { userId, consumedAt: null, expiresAt: { gt: now } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: { id: true },
+      });
+      if (latest?.id !== result.tokenId) return;
+      await tx.emailVerificationToken.updateMany({ where: { userId, id: { not: result.tokenId }, consumedAt: null }, data: { consumedAt: now } });
+    });
   }
 
   async requestPasswordReset(email: string): Promise<void> {
@@ -134,19 +156,22 @@ export class IdentityService {
     if (!observed) return;
     const result = await this.db.$transaction(async tx => {
       const user = await this.lockUser(tx, observed.id);
-      return { email: user.email, token: await this.createToken(tx, user.id, 'reset', this.clock.now()) };
+      return { email: user.email, token: (await this.createToken(tx, user.id, 'reset', this.clock.now())).token };
     });
-    this.send(result.email, result.token, 'reset');
+    void this.send(result.email, result.token, 'reset');
   }
 
   async confirmVerification(token: string): Promise<void> {
     const observed = await this.db.emailVerificationToken.findUnique({ where: { tokenHash: sha256(token) } });
     if (!observed) throw invalidToken();
     await this.db.$transaction(async tx => {
-      await this.lockUser(tx, observed.userId);
+      const user = await this.lockUser(tx, observed.userId);
       const now = this.clock.now();
       const consumed = await tx.emailVerificationToken.updateMany({ where: { id: observed.id, consumedAt: null, expiresAt: { gt: now } }, data: { consumedAt: now } });
-      if (consumed.count !== 1) throw invalidToken();
+      if (consumed.count !== 1) {
+        if (user.emailVerifiedAt) return;
+        throw invalidToken();
+      }
       await tx.user.update({ where: { id: observed.userId }, data: { emailVerifiedAt: now } });
     });
   }

@@ -37,4 +37,10 @@ describe("same-origin mutation transport", () => {
     get.mockResolvedValueOnce({ data: accessFixture() }).mockResolvedValueOnce({ data: { user: {} } });
     expect(await getSnapshot()).toEqual(accessFixture()); await expect(getSnapshot()).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
   });
+  it("accepts a revoked-access snapshot while retaining the authenticated user", async () => {
+    const revoked = accessFixture(false);
+    revoked.onboarding = { canCreateOrganization: false, reason: "ACCESS_REVOKED" };
+    get.mockResolvedValueOnce({ data: revoked });
+    await expect(getSnapshot()).resolves.toEqual(revoked);
+  });
 });

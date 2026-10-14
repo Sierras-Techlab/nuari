@@ -46,7 +46,7 @@ Se acordó desplegar NestJS como proceso o contenedor, pero no se eligió entre 
 
 ### Autenticación
 
-El backend y el frontend de [`TASK-07`](../docs/tasks/TASK-07-feat-001-authentication-onboarding.md) implementan las fases A–D en código, pero el comportamiento persistente no está validado: migraciones, constraints, rollback y concurrencia requieren PostgreSQL aislado. También faltan Playwright E2E, revisión final de races/rate limits, correo real y validación de cookies/proxies/transporte en staging. La feature no está lista para publicación; seguir TASK-07 y no declarar FEAT-001 terminada.
+La corrección Fase 1 (2026-10-13) validó contra PostgreSQL aislado el registro con retorno, sesión automática, confirmación idempotente, expiración/consumo, reenvío concurrente y preservación del token ante fallo del adaptador. Siguen pendientes Playwright E2E del flujo completo, la revisión amplia de races/rate limits, correo real y validación de cookies/proxies/transporte en staging. El dispatcher actual sólo conoce el resultado del adaptador en memoria: no garantiza entrega final, rebotes ni reintentos durables; resolverlo requiere una decisión posterior de outbox/cola y queda fuera de esta fase. No declarar FEAT-001/FEAT-002 publicadas por estas pruebas focalizadas.
 
 ### Auditoría de dependencias TASK-07
 

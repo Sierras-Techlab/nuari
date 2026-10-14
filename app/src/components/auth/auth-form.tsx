@@ -9,15 +9,17 @@ import { useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import { getSnapshot, login, register } from "@/lib/api/browser";
 import { toApiError } from "@/lib/api/errors";
+import { isSafeReturnTo } from "@/lib/navigation/return-to";
 
 type AuthMode = "login" | "register";
 
 type AuthFormProps = {
   mode: AuthMode;
   registered?: boolean;
+  returnTo?: string;
 };
 
-export function AuthForm({ mode, registered = false }: AuthFormProps) {
+export function AuthForm({ mode, registered = false, returnTo }: AuthFormProps) {
   const router = useRouter();
   const navigating = useRef(false);
   const hydrated = useSyncExternalStore(noopSubscribe, getClientSnapshot, getServerSnapshot);
@@ -42,14 +44,20 @@ export function AuthForm({ mode, registered = false }: AuthFormProps) {
       if (!isLogin) {
         const name = `${String(data.get("firstName") ?? "").trim()} ${String(data.get("lastName") ?? "").trim()}`.trim();
         if (name.length > 100) { setMessage("El nombre completo no puede superar 100 caracteres."); return; }
-        await register({ name, email, password });
+        await register({ name, email, password, ...(returnTo && isSafeReturnTo(returnTo) ? { returnTo } : {}) });
+        await login({ email, password });
         form.reset();
-        router.replace("/login?registered=1");
+        const verificationUrl = returnTo ? `/verify-email?registered=1&returnTo=${encodeURIComponent(returnTo)}` : "/verify-email?registered=1";
+        router.replace(verificationUrl);
       } else {
         await login({ email, password });
         form.reset();
-        const snapshot = await getSnapshot();
-        router.replace(snapshot.memberships.length ? "/app" : "/onboarding");
+        if (returnTo && isSafeReturnTo(returnTo)) {
+          router.replace(returnTo);
+        } else {
+          const snapshot = await getSnapshot();
+          router.replace(snapshot.memberships.length ? "/app" : "/onboarding");
+        }
       }
       router.refresh();
     } catch (error) {
@@ -57,6 +65,14 @@ export function AuthForm({ mode, registered = false }: AuthFormProps) {
       setMessage(failure.message); setFieldErrors(failure.fieldErrors);
     } finally { navigating.current = false; setPending(false); }
   }
+
+  const switchHref = isLogin
+    ? returnTo
+      ? `/register?returnTo=${encodeURIComponent(returnTo)}`
+      : "/register"
+    : returnTo
+      ? `/login?returnTo=${encodeURIComponent(returnTo)}`
+      : "/login";
 
   return (
     <div key={mode} className="auth-form-transition">
@@ -82,7 +98,7 @@ export function AuthForm({ mode, registered = false }: AuthFormProps) {
 
       <p className="mt-8 text-center text-sm text-[#667078]">
         {isLogin ? "¿Todavía no tenés una cuenta? " : "¿Ya tenés una cuenta? "}
-        <Link href={isLogin ? "/register" : "/login"} className="font-bold text-[#182026] transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#182026] focus-visible:ring-offset-2">{isLogin ? "Crear cuenta" : "Iniciar sesión"}</Link>
+        <Link href={switchHref} className="font-bold text-[#182026] transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#182026] focus-visible:ring-offset-2">{isLogin ? "Crear cuenta" : "Iniciar sesión"}</Link>
       </p>
 
       <div className="mt-12 flex items-center justify-center gap-1.5 text-center text-xs font-medium text-[#667078] md:hidden"><LockKey aria-hidden="true" weight="fill" /> Acceso seguro a tu espacio de trabajo.</div>

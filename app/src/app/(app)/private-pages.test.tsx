@@ -7,10 +7,11 @@ import ServicesPage from "./app/servicios/page";
 import ClientsPage from "./app/clientes/page";
 import CashPage from "./app/caja/page";
 import TeamPage from "./app/equipo/page";
+import SettingsPage from "./app/configuracion/page";
 const { guardPage } = vi.hoisted(() => ({ guardPage: vi.fn() }));
 vi.mock("@/lib/auth/server", () => ({ guardPage }));
 describe("private page entrypoints (not just layout)", () => {
-  it.each([AgendaPage, ServicesPage, ClientsPage, CashPage, TeamPage])("checks business access before constructing private content for %s", async (page) => {
+  it.each([AgendaPage, ServicesPage, ClientsPage, CashPage, TeamPage, SettingsPage])("checks business access before constructing private content for %s", async (page) => {
     guardPage.mockResolvedValueOnce(null); const closed = await page(); expect(guardPage).toHaveBeenLastCalledWith("business"); expect(closed.type).toBe(AccessError);
     guardPage.mockResolvedValueOnce(accessFixture()); const allowed = await page(); expect(allowed.type).not.toBe(AccessError);
   });

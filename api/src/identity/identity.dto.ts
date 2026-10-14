@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsString, IsUUID, Length, Matches, MaxLength, registerDecorator, type ValidationOptions } from 'class-validator';
+import { IsEmail, IsOptional, IsString, IsUUID, Length, Matches, MaxLength, registerDecorator, type ValidationOptions } from 'class-validator';
 
 const trim = ({ value }: { value: unknown }): unknown => typeof value === 'string' ? value.trim() : value;
 const email = ({ value }: { value: unknown }): unknown => typeof value === 'string' ? value.trim().toLowerCase() : value;
@@ -12,6 +12,28 @@ export function Password(options?: ValidationOptions): PropertyDecorator {
   });
 }
 
+export const SAFE_RETURN_TO_PATTERN = /^[/](?![/\\])[^\\]*$/;
+export function isSafeReturnTo(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= 2048 && SAFE_RETURN_TO_PATTERN.test(value) && [...value].every(character => {
+    const code = character.charCodeAt(0);
+    return code >= 0x20 && code !== 0x7f;
+  });
+}
+
+function ReturnToProperty(): PropertyDecorator {
+  return (target, property) => {
+    IsOptional()(target, property);
+    IsString()(target, property);
+    MaxLength(2048)(target, property);
+    registerDecorator({
+      name: 'safeReturnTo',
+      target: target.constructor,
+      propertyName: String(property),
+      validator: { validate: value => isSafeReturnTo(value), defaultMessage: () => 'La ruta de retorno no es válida.' },
+    });
+  };
+}
+
 export class LoginDto {
   @Transform(email) @IsString() @IsEmail() @MaxLength(254)
   email: string;
@@ -21,6 +43,12 @@ export class LoginDto {
 export class RegisterDto extends LoginDto {
   @Transform(trim) @IsString() @Length(1, 100)
   name: string;
+  @ReturnToProperty()
+  returnTo?: string;
+}
+export class VerificationRequestDto {
+  @ReturnToProperty()
+  returnTo?: string;
 }
 export class EmailDto {
   @Transform(email) @IsString() @IsEmail() @MaxLength(254)

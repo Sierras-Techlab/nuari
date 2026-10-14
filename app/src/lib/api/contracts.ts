@@ -2,8 +2,79 @@ export type BusinessType = "SERVICES" | "COMMERCE" | "HOSPITALITY";
 export type PlanCode = "BASIC" | "PRO" | "BUSINESS" | "TOURISM";
 export type OrganizationRole = "OWNER" | "ADMIN" | "EMPLOYEE";
 export type UserDTO = { id: string; name: string; email: string; emailVerifiedAt: string | null };
-export type OrganizationDTO = { id: string; name: string; slug: string; businessType: BusinessType; createdAt: string; updatedAt: string };
+export type OrganizationDTO = {
+  id: string;
+  name: string;
+  slug: string;
+  businessType: BusinessType;
+  description?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  country?: string;
+  state?: string;
+  city?: string;
+  zip?: string;
+  address?: string;
+  timezone: string;
+  currency: string;
+  logoUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 export type MembershipDTO = { id: string; organizationId: string; role: OrganizationRole; status: "ACTIVE" | "INACTIVE" };
+export type MemberDetailDTO = {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  role: OrganizationRole;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
+  updatedAt: string;
+};
+export type InvitationDTO = {
+  id: string;
+  organizationId: string;
+  email: string;
+  role: OrganizationRole;
+  createdAt: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+};
+export type PublicInvitationDTO = {
+  id: string;
+  organizationName: string;
+  organizationSlug: string;
+  email: string;
+  role: OrganizationRole;
+  expiresAt: string;
+};
+export type AcceptInvitationResult = {
+  organization: OrganizationDTO;
+  membership: MembershipDTO;
+};
+export type UpdateOrganizationInput = Partial<{
+  name: string;
+  slug: string;
+  description: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  country: string;
+  state: string | null;
+  city: string | null;
+  zip: string | null;
+  address: string | null;
+  timezone: string;
+  currency: string;
+  logoUrl: string | null;
+}>;
+export type CreateInvitationInput = {
+  email: string;
+  role: OrganizationRole;
+};
 export type SubscriptionDTO = { id: string; organizationId: string; planCode: PlanCode; status: "TRIALING" | "EXPIRED" | "ACTIVE" | "PAST_DUE" | "CANCELED"; trialStartedAt: string; trialEndsAt: string; paidThrough: string | null };
 export type Access = { businessAllowed: boolean; reason: "TRIAL_ACTIVE" | "PAID_ACTIVE" | "TRIAL_EXPIRED" | "SUBSCRIPTION_INACTIVE"; validUntil: string | null; canManageSubscription: boolean };
 export type AccessSnapshot = {
@@ -11,15 +82,41 @@ export type AccessSnapshot = {
   memberships: { id: string; role: OrganizationRole; organization: OrganizationDTO }[];
   activeOrganizationId: string | null;
   access: Access | null;
-  onboarding: { canCreateOrganization: boolean; reason: "ELIGIBLE" | "EMAIL_UNVERIFIED" | "HAS_MEMBERSHIP" | "TRIAL_ALREADY_USED" };
+  onboarding: { canCreateOrganization: boolean; reason: "ELIGIBLE" | "EMAIL_UNVERIFIED" | "HAS_MEMBERSHIP" | "TRIAL_ALREADY_USED" | "ACCESS_REVOKED" };
 };
 export type OrganizationInput = { name: string; slug: string; businessType: BusinessType; planCode: PlanCode };
 export type OrganizationResult = { organization: OrganizationDTO; membership: MembershipDTO; subscription: SubscriptionDTO };
 export type WorkspaceDTO = { organization: OrganizationDTO; membership: MembershipDTO; access: Access; evaluatedAt: string };
 export type SubscriptionResult = { subscription: SubscriptionDTO; access: Access };
-export type ApiErrorCode = "VALIDATION_ERROR" | "INVALID_TOKEN" | "INVALID_IDEMPOTENCY_KEY" | "UNAUTHENTICATED" | "INVALID_CREDENTIALS" | "CSRF_INVALID" | "EMAIL_UNVERIFIED" | "TRIAL_ALREADY_USED" | "PERMISSION_DENIED" | "SUBSCRIPTION_REQUIRED" | "ORGANIZATION_NOT_FOUND" | "SLUG_TAKEN" | "ONBOARDING_ALREADY_COMPLETED" | "IDEMPOTENCY_CONFLICT" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "CONTEXT_CHANGED";
+export type ApiErrorCode = "VALIDATION_ERROR" | "INVALID_TOKEN" | "INVALID_IDEMPOTENCY_KEY" | "UNAUTHENTICATED" | "INVALID_CREDENTIALS" | "CSRF_INVALID" | "EMAIL_UNVERIFIED" | "TRIAL_ALREADY_USED" | "PERMISSION_DENIED" | "SUBSCRIPTION_REQUIRED" | "ORGANIZATION_NOT_FOUND" | "SLUG_TAKEN" | "ONBOARDING_ALREADY_COMPLETED" | "IDEMPOTENCY_CONFLICT" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "CONTEXT_CHANGED" | "CANNOT_REMOVE_LAST_OWNER" | "MEMBER_NOT_FOUND" | "INVITATION_NOT_FOUND" | "ALREADY_MEMBER" | "EMAIL_MISMATCH" | "INVALID_INVITATION";
+
 export type ApiErrorDTO = { code: ApiErrorCode; message: string; fieldErrors?: Record<string, string[]> };
-const errorCodes = new Set<string>(["VALIDATION_ERROR", "INVALID_TOKEN", "INVALID_IDEMPOTENCY_KEY", "UNAUTHENTICATED", "INVALID_CREDENTIALS", "CSRF_INVALID", "EMAIL_UNVERIFIED", "TRIAL_ALREADY_USED", "PERMISSION_DENIED", "SUBSCRIPTION_REQUIRED", "ORGANIZATION_NOT_FOUND", "SLUG_TAKEN", "ONBOARDING_ALREADY_COMPLETED", "IDEMPOTENCY_CONFLICT", "RATE_LIMITED", "INTERNAL_ERROR", "SERVICE_UNAVAILABLE", "CONTEXT_CHANGED"]);
+const errorCodes = new Set<string>([
+  "VALIDATION_ERROR",
+  "INVALID_TOKEN",
+  "INVALID_IDEMPOTENCY_KEY",
+  "UNAUTHENTICATED",
+  "INVALID_CREDENTIALS",
+  "CSRF_INVALID",
+  "EMAIL_UNVERIFIED",
+  "TRIAL_ALREADY_USED",
+  "PERMISSION_DENIED",
+  "SUBSCRIPTION_REQUIRED",
+  "ORGANIZATION_NOT_FOUND",
+  "SLUG_TAKEN",
+  "ONBOARDING_ALREADY_COMPLETED",
+  "IDEMPOTENCY_CONFLICT",
+  "RATE_LIMITED",
+  "INTERNAL_ERROR",
+  "SERVICE_UNAVAILABLE",
+  "CONTEXT_CHANGED",
+  "CANNOT_REMOVE_LAST_OWNER",
+  "MEMBER_NOT_FOUND",
+  "INVITATION_NOT_FOUND",
+  "ALREADY_MEMBER",
+  "EMAIL_MISMATCH",
+  "INVALID_INVITATION",
+]);
 
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null; }
 function nullableString(value: unknown): boolean { return value === null || typeof value === "string"; }
@@ -35,7 +132,7 @@ export function isAccessSnapshot(value: unknown): value is AccessSnapshot {
   return [value.user.id, value.user.name, value.user.email].every((field) => typeof field === "string") && nullableString(value.user.emailVerifiedAt)
     && value.memberships.every((member: unknown) => record(member) && typeof member.id === "string" && role(member.role) && organization(member.organization))
     && nullableString(value.activeOrganizationId) && (value.access === null || access(value.access))
-    && typeof value.onboarding.canCreateOrganization === "boolean" && ["ELIGIBLE", "EMAIL_UNVERIFIED", "HAS_MEMBERSHIP", "TRIAL_ALREADY_USED"].includes(String(value.onboarding.reason))
+    && typeof value.onboarding.canCreateOrganization === "boolean" && ["ELIGIBLE", "EMAIL_UNVERIFIED", "HAS_MEMBERSHIP", "TRIAL_ALREADY_USED", "ACCESS_REVOKED"].includes(String(value.onboarding.reason))
     && (value.activeOrganizationId === null ? value.access === null : value.memberships.some((member: unknown) => record(member) && record(member.organization) && member.organization.id === value.activeOrganizationId));
 }
 export function isApiErrorDTO(value: unknown): value is ApiErrorDTO {

@@ -7,7 +7,7 @@ import { cookieValue, type AuthRequest } from '../common/request.js';
 import { RateLimiter } from '../common/rate-limiter.js';
 import { SecurityConfig } from '../common/security.config.js';
 import { IdentityService } from './identity.service.js';
-import { EmptyDto, EmailDto, LoginDto, RegisterDto, ResetPasswordDto, TokenDto } from './identity.dto.js';
+import { EmptyDto, EmailDto, LoginDto, RegisterDto, ResetPasswordDto, TokenDto, VerificationRequestDto } from './identity.dto.js';
 import { Public } from './public.decorator.js';
 
 const GENERIC_MESSAGE = 'Si los datos son válidos, recibirás instrucciones en tu correo.';
@@ -72,9 +72,9 @@ export class IdentityController {
 
   @Post('email-verification/request')
   @HttpCode(HttpStatus.ACCEPTED)
-  async requestVerification(@Req() request: AuthRequest, @Res({ passthrough: true }) response: Response, @Body() _input: EmptyDto) {
+  async requestVerification(@Req() request: AuthRequest, @Res({ passthrough: true }) response: Response, @Body() input: VerificationRequestDto) {
     await this.limiter.consume('verification-user', request.principal!.userId, 5, 3_600_000);
-    await this.identity.requestVerification(request.principal!.userId);
+    await this.identity.requestVerification(request.principal!.userId, input.returnTo);
     response.setHeader('Cache-Control', 'no-store');
     return { message: GENERIC_MESSAGE };
   }

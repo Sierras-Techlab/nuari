@@ -1,30 +1,29 @@
 # Context snapshot
 
-- Actualizado: 2026-10-12
-- Estado del repositorio: FEAT-001 (TASK-07) completada y verificada de punta a punta. Migraciones aplicadas en Neon dev (`ep-shiny-firefly-b6z1ay37`). Pruebas unitarias, de integración, HTTP e2e y Playwright en navegador aprobadas. Teardown y limpieza de fixtures validado sin errores.
-- Fase: FEAT-001 terminada y verificada. Listo para planificar e implementar FEAT-002 (persistencia y lógica de negocio del flujo vertical / Turnero).
+- Actualizado: 2026-10-14
+- Estado del repositorio: corregida la revocación FEAT-002: el listado filtra membresías activas, el estado revocado se informa al usuario, y el contexto de autenticación conserva/fallbackea la sesión. Se mantienen los cambios previos de TASK-08 en el árbol de trabajo.
+- Fase: recuperación del registro → verificación → retorno a invitación completada; revocación de miembros y navegación posterior corregidas. Fase 2 de endurecimiento general de invitaciones no iniciada.
 
 ## Objetivo actual
 
-Preparar la especificación e inicio de FEAT-002, integrando los flujos del Turnero con el contexto de autenticación, organización y persistencia de PostgreSQL establecido por FEAT-001.
+La corrección acotada de revocación de FEAT-002 está implementada; no iniciar la Fase 2 de endurecimiento general de invitaciones sin autorización explícita.
 
 ## Estado verificable
 
 - `app/` y `api/` son proyectos npm independientes; el frontend usa Next.js y la API usa NestJS.
 - La raíz de Turbopack está fijada explícitamente en `app/next.config.ts`.
 - Registro, login, logout, recuperación/verificación de correo y onboarding usan el transporte same-origin `/api`; la creación inicial y los contextos de organización provienen de la API. `/onboarding` y cada página `/app/**` verifican contexto server-side.
-- `/app` presenta el módulo Turnero; `/app/agenda`, `/app/servicios`, `/app/clientes`, `/app/caja` y `/app/equipo` permiten recorrer y registrar datos locales durante la sesión.
-- La base de datos Neon PostgreSQL (`ep-shiny-firefly-b6z1ay37`, rama `dev`) tiene las 3 migraciones aplicadas (`202610120001_identity_security`, `202610120002_organizations`, `202610120003_subscriptions_onboarding`).
-- Verificaciones aprobadas en API:
-  - Unit tests (`npm test`): 64/64 PASS.
-  - Integration tests (`npm run test:integration` contra Neon dev): 26/26 PASS (concurrencia, idempotencia, unicidad, rollback).
-  - HTTP E2E (`npm run test:e2e` Supertest): 25/25 PASS.
-  - Typecheck y Lint: PASS.
-- Verificaciones aprobadas en Frontend:
-  - Unit tests (`npm test`): 126/126 PASS.
-  - Typecheck y Lint: PASS.
-  - Playwright E2E (`app/e2e/authentication.spec.ts`): PASS con código de salida 0. Registro, verificación de token, onboarding de 4 pasos, redirección a `/app`, multi-organización, contexto de empleado, reloj simulado, expiración de prueba (14 días), restricción de rutas privadas y teardown/limpieza en PostgreSQL sin fallos de clave foránea.
-- Los procesos de prueba fueron cerrados y los puertos de prueba liberados sin afectar los servicios activos de desarrollo (`3000` y `3001`).
+- `/app/configuracion` está integrada con la API (`GET /api/organizations/:id` y `PATCH /api/organizations/:id`), validaciones regionales, guardado reactivo, restricción de slug solo a OWNER y aviso explicativo para carga de logos.
+- `/app/configuracion/miembros` está creada y protegida por `guardPage("business")`, integrando el diseño definitivo de Gemini Canvas con React, TypeScript y Tailwind: gestión de roles, listado de miembros activos, emisión de invitaciones por correo, revocación de accesos e invitaciones, restricciones para el último OWNER y control según rol de la sesión.
+- `/invitacion/[token]` está implementada fuera del dashboard con diseño fiel de Gemini Canvas: consulta pública del token, opciones de login/registro, sesión automática tras registro, verificación de identidad por correo, retorno seguro a la invitación y aceptación atómica con asignación directa a la organización.
+- `DELETE /api/organizations/:id/members/:memberId` conserva la cuenta y su historial y marca la membresía `INACTIVE`; `GET /members` lista sólo `ACTIVE`. `/auth/me` reelige una organización activa válida o conserva la sesión sin tenant y reporta `ACCESS_REVOKED`; `/onboarding` explica la revocación y permite crear una organización sólo si el backend lo habilita. `TenantGuard` sigue resolviendo la membresía activa en cada petición.
+- La verificación desde invitaciones conserva `returnTo` validado en el correo de verificación, por lo que funciona al abrirlo en otra pestaña; el reenvío no invalida el último token utilizable si la entrega falla y las confirmaciones repetidas de la misma cuenta verificada son idempotentes.
+- No se agregaron migraciones ni se enviaron correos reales durante esta fase; el dispatcher de memoria informa éxito/fallo del adaptador, pero no garantiza entrega final en la bandeja sin una infraestructura posterior.
+- Verificaciones focalizadas de esta corrección:
+  - API unitarias (`npx vitest run src/organizations/organizations.service.spec.ts src/organizations/tenant.guard.spec.ts`): 21/21 PASS.
+  - API integración (caso `persists member revocation` en `test/auth.integration-spec.ts`): 1/1 PASS contra PostgreSQL de pruebas aislado; sin migraciones.
+  - Frontend (`members-screen`, `onboarding-screen` y `browser.test.ts`): 29/29 PASS.
+  - `npm run lint` y `npm run typecheck` en `api/` y `app/`: PASS.
 
 ## Decisiones vigentes
 
@@ -36,15 +35,11 @@ Preparar la especificación e inicio de FEAT-002, integrando los flujos del Turn
 
 ## Próxima tarea
 
-1. Definir la especificación y criterios de aceptación para FEAT-002 (persistencia y backend del módulo operativo / Turnero para el piloto).
-2. Modelar las entidades operativas (turnos, servicios, profesionales) asegurando aislamiento multi-tenant por `Organization`.
+Esperar autorización del usuario para Fase 2; no comenzar endurecimiento general de invitaciones.
 
 ## Contexto para la próxima tarea
 
-- [`docs/product/mvp.md`](../docs/product/mvp.md)
-- [`docs/product/glossary.md`](../docs/product/glossary.md)
-- [`docs/architecture/modules.md`](../docs/architecture/modules.md)
-- [`docs/architecture/data-model.md`](../docs/architecture/data-model.md)
-- [`docs/architecture/multi-tenancy.md`](../docs/architecture/multi-tenancy.md)
-- [`.ai/known_issues.md`](known_issues.md)
+- [`TASK-08`](../docs/tasks/TASK-08-feat-002-organization-members-invitations.md)
 - [`TASK-07`](../docs/tasks/TASK-07-feat-001-authentication-onboarding.md)
+- [`docs/architecture/decisions/ADR-005-custom-authentication.md`](../docs/architecture/decisions/ADR-005-custom-authentication.md)
+- [`docs/architecture/multi-tenancy.md`](../docs/architecture/multi-tenancy.md)

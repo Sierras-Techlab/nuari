@@ -29,14 +29,32 @@ describe("AuthForm", () => {
     expect(screen.getByLabelText("Contraseña").getAttribute("type")).toBe("text");
   });
 
-  it("registers without creating a session and directs to login", async () => {
+  it("registers, creates a session, and directs to email verification", async () => {
     mocks.register.mockResolvedValue({ message: "ok" });
+    mocks.login.mockResolvedValue({});
     render(<AuthForm mode="register" />);
     fillValidRegistration();
     fireEvent.click(screen.getByRole("button", { name: "Crear mi cuenta" }));
     await waitFor(() => expect(mocks.register).toHaveBeenCalledWith({ name: "Juan Pérez", email: "juan@example.com", password: "correct horse battery" }));
-    expect(mocks.login).not.toHaveBeenCalled();
-    expect(mocks.replace).toHaveBeenCalledWith("/login?registered=1");
+    expect(mocks.login).toHaveBeenCalledWith({ email: "juan@example.com", password: "correct horse battery" });
+    expect(mocks.replace).toHaveBeenCalledWith("/verify-email?registered=1");
+  });
+
+  it("passes a safe invitation return path through registration, login, and verification", async () => {
+    mocks.register.mockResolvedValue({ message: "ok" });
+    mocks.login.mockResolvedValue({});
+    render(<AuthForm mode="register" returnTo="/invitacion/invitation-token-123456789" />);
+    fillValidRegistration();
+    fireEvent.click(screen.getByRole("button", { name: "Crear mi cuenta" }));
+
+    await waitFor(() => expect(mocks.register).toHaveBeenCalledWith({
+      name: "Juan Pérez",
+      email: "juan@example.com",
+      password: "correct horse battery",
+      returnTo: "/invitacion/invitation-token-123456789",
+    }));
+    expect(mocks.login).toHaveBeenCalledWith({ email: "juan@example.com", password: "correct horse battery" });
+    expect(mocks.replace).toHaveBeenCalledWith("/verify-email?registered=1&returnTo=%2Finvitacion%2Finvitation-token-123456789");
   });
 
   it("routes a logged-in user based on their memberships", async () => {
@@ -69,7 +87,8 @@ describe("AuthForm", () => {
     const form = screen.getByRole("button", { name: "Crear mi cuenta" }).closest("form") as HTMLFormElement;
     fireEvent.submit(form); fireEvent.submit(form);
     expect(mocks.register).toHaveBeenCalledOnce(); expect(mocks.replace).not.toHaveBeenCalled(); expect(screen.getByRole<HTMLButtonElement>("button", { name: "Procesando…" }).disabled).toBe(true);
-    confirm?.({ message: "Revisá tu correo" }); await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith("/login?registered=1"));
+    mocks.login.mockResolvedValue({});
+    confirm?.({ message: "Revisá tu correo" }); await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith("/verify-email?registered=1"));
   });
   it("routes active employees to the app without their own onboarding", async () => {
     mocks.login.mockResolvedValue({}); const snapshot = accessFixture(); snapshot.memberships[0].role = "EMPLOYEE"; mocks.getSnapshot.mockResolvedValue(snapshot);
