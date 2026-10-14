@@ -2,8 +2,6 @@ import {
   WorkspaceSourceError,
   type CashMovement,
   type CashMovementInput,
-  type Client,
-  type ClientInput,
   type Service,
   type ServiceInput,
   type TeamInput,
@@ -15,13 +13,6 @@ const initialServices: Service[] = [
   { id: "estandar", name: "Servicio estándar", durationMinutes: 40, description: "Atención habitual", active: true },
   { id: "breve", name: "Servicio breve", durationMinutes: 25, description: "Visita corta", active: true },
   { id: "extendido", name: "Servicio extendido", durationMinutes: 60, description: "Atención con más tiempo", active: true },
-];
-
-const initialClients: Client[] = [
-  { id: "client-1", name: "Nicolás García", phone: "11 5555 1234", email: "nicolas@correo.test", notes: "" },
-  { id: "client-2", name: "Sofía Romano", phone: "11 5555 1235", email: "sofia@correo.test", notes: "Prefiere horarios de mañana" },
-  { id: "client-3", name: "Lucas Gómez", phone: "11 5555 1236", email: "", notes: "" },
-  { id: "client-4", name: "Valentina Díaz", phone: "11 5555 1237", email: "", notes: "" },
 ];
 
 const initialTeam: TeamMember[] = [
@@ -52,7 +43,6 @@ function validDate(value: string): boolean {
 
 export function createLocalWorkspaceSource(): WorkspaceSource {
   let services = initialServices.map((item) => ({ ...item }));
-  let clients = initialClients.map((item) => ({ ...item }));
   let team = initialTeam.map((item) => ({ ...item }));
   let movements = initialCash.map((item) => ({ ...item }));
   let nextId = 10;
@@ -70,22 +60,6 @@ export function createLocalWorkspaceSource(): WorkspaceSource {
       }
       const created: Service = { id: `service-${nextId++}`, name, durationMinutes: input.durationMinutes, description, active: true };
       services = [...services, created];
-      return { ...created };
-    },
-    async listClients() { return clients.map((item) => ({ ...item })); },
-    async createClient(input: ClientInput) {
-      const name = input.name.trim();
-      const phone = input.phone.trim();
-      const email = input.email.trim();
-      const notes = input.notes.trim();
-      if (!name || (!phone && !email) || !validEmail(email)) {
-        throw new WorkspaceSourceError("INVALID_INPUT", "Ingresá un nombre y al menos un teléfono o correo válido.");
-      }
-      if (email && clients.some((item) => normalized(item.email) === normalized(email))) {
-        throw new WorkspaceSourceError("DUPLICATE", "Ya existe un cliente con ese correo.");
-      }
-      const created: Client = { id: `client-${nextId++}`, name, phone, email, notes };
-      clients = [...clients, created];
       return { ...created };
     },
     async listTeam() { return team.map((item) => ({ ...item })); },

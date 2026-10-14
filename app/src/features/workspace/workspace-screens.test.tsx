@@ -12,38 +12,10 @@ import { AgendaScreen } from "@/features/appointments/agenda-screen";
 import { DemoAppointmentProvider } from "@/features/appointments/demo-provider";
 
 import { CashScreen } from "./cash-screen";
-import { ClientsScreen } from "./clients-screen";
-import { ServicesScreen } from "./services-screen";
 import { WorkspaceProvider } from "./workspace-provider";
 
 describe("workspace sections", () => {
   afterEach(cleanup);
-
-  it("adds a service and keeps validation errors in the form", async () => {
-    render(<WorkspaceProvider><ServicesScreen /></WorkspaceProvider>);
-    await screen.findByText("Servicio estándar");
-    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Evaluación" } });
-    fireEvent.change(screen.getByLabelText("Duración en minutos"), { target: { value: "50" } });
-    fireEvent.click(screen.getByRole("button", { name: "Agregar servicio" }));
-    expect(await screen.findByText("Evaluación")).toBeTruthy();
-
-    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Evaluación" } });
-    fireEvent.click(screen.getByRole("button", { name: "Agregar servicio" }));
-    expect(await screen.findByRole("alert")).toBeTruthy();
-    expect((screen.getByLabelText("Nombre") as HTMLInputElement).value).toBe("Evaluación");
-  });
-
-  it("searches clients, adds one and opens the contact card", async () => {
-    render(<WorkspaceProvider><ClientsScreen /></WorkspaceProvider>);
-    await screen.findByRole("button", { name: /Nicolás García/ });
-    fireEvent.change(screen.getByLabelText("Buscar clientes"), { target: { value: "Sofía" } });
-    expect(screen.queryByRole("button", { name: /Nicolás García/ })).toBeNull();
-    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Elena Ruiz" } });
-    fireEvent.change(screen.getByLabelText("Teléfono"), { target: { value: "11 5555 9090" } });
-    fireEvent.click(screen.getByRole("button", { name: "Agregar cliente" }));
-    expect(await screen.findByRole("button", { name: /Elena Ruiz/ })).toBeTruthy();
-    expect(screen.getAllByText("11 5555 9090")).toHaveLength(2);
-  });
 
   it("records a manual cash movement and filters the register", async () => {
     render(<WorkspaceProvider><CashScreen /></WorkspaceProvider>);
@@ -63,17 +35,13 @@ describe("workspace sections", () => {
     expect(screen.queryByText("Ingreso manual")).toBeNull();
   });
 
-  it("offers services and operational professionals when creating a turn", async () => {
+  it("keeps demo services and professionals available to the local appointment prototype", async () => {
     const tree = (child: React.ReactNode) => <WorkspaceProvider><DemoAppointmentProvider>{child}</DemoAppointmentProvider></WorkspaceProvider>;
-    const view = render(tree(<ServicesScreen />));
-    await screen.findByText("Servicio estándar");
-    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Evaluación" } });
-    fireEvent.click(screen.getByRole("button", { name: "Agregar servicio" }));
-    await screen.findByText("Evaluación");
-
-    view.rerender(tree(<AgendaScreen />));
-    fireEvent.click(await screen.findByRole("button", { name: "Nuevo turno" }));
-    expect(screen.getByRole("option", { name: /Evaluación/ })).toBeTruthy();
+    render(tree(<AgendaScreen />));
+    const newAppointment = await screen.findByRole("button", { name: "Nuevo turno" });
+    await waitFor(() => expect((newAppointment as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(newAppointment);
+    expect(screen.getByRole("option", { name: /Servicio estándar/ })).toBeTruthy();
     expect(screen.getAllByRole("option", { name: "Martín Ríos" })).toHaveLength(2);
   });
 });

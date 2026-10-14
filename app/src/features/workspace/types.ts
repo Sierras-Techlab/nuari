@@ -8,16 +8,6 @@ export type Service = {
 
 export type ServiceInput = Pick<Service, "name" | "durationMinutes" | "description">;
 
-export type Client = {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  notes: string;
-};
-
-export type ClientInput = Omit<Client, "id">;
-
 export type TeamMember = {
   id: string;
   name: string;
@@ -41,8 +31,6 @@ export type CashMovementInput = Omit<CashMovement, "id">;
 export interface WorkspaceSource {
   listServices(): Promise<Service[]>;
   createService(input: ServiceInput): Promise<Service>;
-  listClients(): Promise<Client[]>;
-  createClient(input: ClientInput): Promise<Client>;
   listTeam(): Promise<TeamMember[]>;
   createTeamMember(input: TeamInput): Promise<TeamMember>;
   listCashMovements(): Promise<CashMovement[]>;

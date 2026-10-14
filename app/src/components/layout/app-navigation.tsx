@@ -5,6 +5,7 @@ import { AddressBook } from "@phosphor-icons/react/dist/csr/AddressBook";
 import { House } from "@phosphor-icons/react/dist/csr/House";
 import { SquaresFour } from "@phosphor-icons/react/dist/csr/SquaresFour";
 import { UsersThree } from "@phosphor-icons/react/dist/csr/UsersThree";
+import { UserCircle } from "@phosphor-icons/react/dist/csr/UserCircle";
 import { Wallet } from "@phosphor-icons/react/dist/csr/Wallet";
 import { Gear } from "@phosphor-icons/react/dist/csr/Gear";
 import Link from "next/link";
@@ -24,6 +25,12 @@ export const appNavigation = [
     href: "/app/servicios",
     label: "Servicios",
     icon: SquaresFour,
+    group: "Turnero",
+  },
+  {
+    href: "/app/profesionales",
+    label: "Profesionales",
+    icon: UserCircle,
     group: "Turnero",
   },
   {

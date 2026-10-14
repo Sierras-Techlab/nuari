@@ -26,6 +26,8 @@ Un `organizationId` enviado por ruta, cabecera o body sólo selecciona una organ
 - Las consultas por identificador también filtran por organización.
 - Las restricciones únicas de negocio incluyen la organización cuando la unicidad no es global.
 - Las relaciones deben evitar referencias cruzadas entre tenants, utilizando restricciones compuestas cuando sea práctico.
+- En el catálogo operativo, Customer, ServiceCategory, Service y StaffMember tienen propietario Organization; StaffService repite `organizationId` y referencia claves compuestas de StaffMember y Service. Service también referencia de forma compuesta su categoría. Estas FK bloquean asociaciones entre tenants a nivel de base de datos.
+- Los controladores resuelven los identificadores dentro del tenant context y devuelven no encontrado para recursos ajenos; las asociaciones comprueban permisos conjuntos y su organización antes de mutar. StaffMember.userId nullable no concede acceso ni sustituye OrganizationMember.
 
 ## Autorización
 
@@ -53,6 +55,8 @@ Para cada módulo tenant-aware se deben cubrir casos como:
 - Miembro de una organización no puede leer un identificador perteneciente a otra.
 - Una escritura no puede relacionar entidades de organizaciones diferentes.
 - Una búsqueda, reporte o exportación no mezcla tenants.
+
+FEAT-003 B10 verificó por HTTP el aislamiento de Customer, Service y StaffMember entre dos organizaciones, el rechazo de recursos/relaciones ajenos y la revocación de membresía. Los casos de FK cruzada directa por SQL se especifican en TASK-09 y siguen pendientes de una base desechable para validación adicional.
 
 ## Operaciones globales
 

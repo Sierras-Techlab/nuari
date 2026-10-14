@@ -135,6 +135,11 @@ export async function createApiHarness(options: { clock?: MutableClock; emailSen
       await tx.organizationMember.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { organizationId: { in: orgIds } }] } });
       await tx.subscription.deleteMany({ where: { organizationId: { in: orgIds } } });
       await tx.session.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { activeOrganizationId: { in: orgIds } }] } });
+      await tx.customer.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await tx.staffService.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await tx.service.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await tx.serviceCategory.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await tx.staffMember.deleteMany({ where: { organizationId: { in: orgIds } } });
       await tx.organization.deleteMany({ where: { id: { in: orgIds } } });
       await tx.user.deleteMany({ where: { id: { in: userIds } } });
     });

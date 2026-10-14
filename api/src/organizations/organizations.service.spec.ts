@@ -49,7 +49,8 @@ function setup(overrides: { existing?: object | null; members?: object[]; grant?
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     onboardingSubmission: { findUnique: vi.fn().mockResolvedValue(overrides.existing ?? null), create: vi.fn().mockResolvedValue({}) },
-    organization: { create: vi.fn().mockResolvedValue(org), update: vi.fn().mockResolvedValue(org) },
+    organization: { create: vi.fn().mockResolvedValue(org), findUnique: vi.fn().mockResolvedValue(org), update: vi.fn().mockResolvedValue(org) },
+    service: { findFirst: vi.fn().mockResolvedValue(null), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     organizationAuditLog: { create: vi.fn().mockResolvedValue({}) },
   };
   const db = {
@@ -145,7 +146,73 @@ describe('OrganizationsService initial onboarding', () => {
   });
 });
 
+describe('OrganizationsService operational audit', () => {
+  it('records changed field names in the supplied transaction without storing values', async () => {
+    const { service, tx } = setup();
+    await service.recordOperationalAudit(tx as never, {
+      organizationId: org.id,
+      actorUserId: 'user-id',
+      action: 'CUSTOMER_UPDATED',
+      targetId: 'customer-id',
+      changedFields: ['name', 'phone'],
+    });
+
+    expect(tx.organizationAuditLog.create).toHaveBeenCalledWith({
+      data: {
+        organizationId: org.id,
+        actorUserId: 'user-id',
+        action: 'CUSTOMER_UPDATED',
+        targetId: 'customer-id',
+        metadata: JSON.stringify({ changedFields: ['name', 'phone'] }),
+        createdAt: now,
+      },
+    });
+  });
+
+  it('rejects field values that are not approved audit field names', async () => {
+    const { service, tx } = setup();
+    await expect(service.recordOperationalAudit(tx as never, {
+      organizationId: org.id,
+      actorUserId: 'user-id',
+      action: 'CUSTOMER_UPDATED',
+      targetId: 'customer-id',
+      changedFields: ['phone:+5491122334455'] as never,
+    })).rejects.toThrow('Invalid operational audit field.');
+    expect(tx.organizationAuditLog.create).not.toHaveBeenCalled();
+  });
+});
+
 describe('OrganizationsService updateSettings', () => {
+  it('requires explicit confirmation for an effective currency change', async () => {
+    const { service, tx } = setup();
+    await expect(service.updateSettings(member, 'user-id', { country: 'UY' })).rejects.toMatchObject({
+      status: 400, response: { code: 'VALIDATION_ERROR', fieldErrors: { confirmCurrencyChange: expect.any(Array) } },
+    });
+    expect(tx.organization.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks currency changes when any service has a persisted amount, even zero/inactive', async () => {
+    const { service, tx } = setup();
+    tx.service.findFirst = vi.fn().mockResolvedValue({ id: 'priced-service' });
+    await expect(service.updateSettings(member, 'user-id', { country: 'UY', confirmCurrencyChange: true })).rejects.toMatchObject({
+      status: 409, response: { code: 'CURRENCY_CHANGE_REQUIRES_MIGRATION' },
+    });
+    expect(tx.organization.update).not.toHaveBeenCalled();
+    expect(tx.service.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('updates descriptive currency atomically for services with no price after confirmation', async () => {
+    const { service, tx } = setup();
+    await service.updateSettings(member, 'user-id', { country: 'UY', confirmCurrencyChange: true });
+    expect(tx.organization.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: org.id }, data: expect.objectContaining({ country: 'UY', currency: 'UYU' }),
+    }));
+    expect(tx.service.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { organizationId: org.id, price: null },
+      data: expect.objectContaining({ currency: 'UYU', version: { increment: 1 }, updatedAt: now }),
+    }));
+  });
+
   it('allows OWNER to update commercial settings, slug, and records audit log', async () => {
     const { service, tx } = setup();
     tx.organization.update = vi.fn().mockResolvedValue({

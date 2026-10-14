@@ -2,7 +2,7 @@
 
 ## Estado
 
-Esta arquitectura está aplicada en la base técnica inicial. La raíz contiene una aplicación Next.js y una API NestJS como proyectos npm independientes; los módulos de negocio todavía no fueron implementados.
+Esta arquitectura está aplicada en la base técnica inicial. La raíz contiene una aplicación Next.js y una API NestJS como proyectos npm independientes. FEAT-003 B1–B10 implementaron el catálogo operativo persistente de clientes, categorías, servicios, fichas de profesionales y sus habilitaciones, con aislamiento por organización en API y frontend. La Agenda sigue siendo una demostración local; ventas, asistencia, reportes y asignación efectiva no forman parte de este alcance.
 
 ## Enfoque
 

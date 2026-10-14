@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsEnum, IsNotIn, IsOptional, IsString, Length, Matches, ValidateIf } from 'class-validator';
+import { IsBoolean, IsEmail, IsEnum, IsNotIn, IsOptional, IsString, Length, Matches, ValidateIf } from 'class-validator';
 import { BusinessType, OrganizationRole, PlanCode } from '../generated/prisma/client.js';
 
 
@@ -50,6 +50,10 @@ export const REGIONAL_CONFIG = {
 export type SupportedCountry = keyof typeof REGIONAL_CONFIG;
 
 export class UpdateOrganizationDto {
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsBoolean()
+  confirmCurrencyChange?: boolean;
+
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value)
   @IsString() @Length(1, 100)

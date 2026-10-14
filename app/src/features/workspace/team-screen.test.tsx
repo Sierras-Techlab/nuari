@@ -44,7 +44,8 @@ describe("TeamScreen organization access management", () => {
 
   it("keeps the Equipo design while listing live members and identifying the signed-in user", async () => {
     render(<TeamScreen />);
-    expect(screen.getByRole("heading", { name: "Un equipo conectado." })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Accesos del equipo." })).toBeTruthy();
+    expect(screen.getByText(/fichas del personal operativo se gestionan en Profesionales/)).toBeTruthy();
     expect(screen.getByText("Personas del equipo")).toBeTruthy();
     expect(await screen.findByText("Martín Silva")).toBeTruthy();
     expect(screen.getByText(/\(Vos\)/)).toBeTruthy();

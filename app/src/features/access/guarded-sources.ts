@@ -6,8 +6,6 @@ export function guardWorkspaceSource(source: WorkspaceSource, preflight: Preflig
   return {
     listServices: () => authorized(preflight, () => source.listServices()),
     createService: (input) => authorized(preflight, () => source.createService(input)),
-    listClients: () => authorized(preflight, () => source.listClients()),
-    createClient: (input) => authorized(preflight, () => source.createClient(input)),
     listTeam: () => authorized(preflight, () => source.listTeam()),
     createTeamMember: (input) => authorized(preflight, () => source.createTeamMember(input)),
     listCashMovements: () => authorized(preflight, () => source.listCashMovements()),

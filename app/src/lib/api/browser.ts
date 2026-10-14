@@ -3,6 +3,31 @@ import { getApiClient } from "./api-client";
 import {
   isAccessSnapshot,
   type AccessSnapshot,
+  type CreateCustomerInput,
+  type CustomerDTO,
+  type CustomerListInput,
+  type CustomerPageDTO,
+  type DuplicateCustomerCandidatesDTO,
+  type CreateServiceCategoryInput,
+  type UpdateServiceCategoryInput,
+  type ServiceCategoryDTO,
+  type ServiceCategoryListInput,
+  type ServiceCategoryPageDTO,
+  type CreateServiceInput,
+  type UpdateServiceInput,
+  type ServiceDTO,
+  type ServiceListInput,
+  type ServicePageDTO,
+  type StaffListInput,
+  type StaffDTO,
+  type StaffPageDTO,
+  type CreateStaffInput,
+  type UpdateStaffInput,
+  type StaffServiceListQuery,
+  type StaffServicePageDTO,
+  type StaffServiceMutationDTO,
+  type StaffServiceRemoveDTO,
+  type UpdateCustomerInput,
   type CreateInvitationInput,
   type InvitationDTO,
   type MemberDetailDTO,
@@ -87,6 +112,75 @@ export async function apiPatch<T>(path: string, body: unknown = {}, config: Axio
   }
   throw new ApiError(403, "CSRF_INVALID", "No pudimos verificar la solicitud.");
 }
+export async function apiPatchVersioned<T>(path: string, body: unknown, version: number, config: AxiosRequestConfig = {}): Promise<T> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const token = csrfToken ?? await refreshCsrfToken();
+    try {
+      const response = await getApiClient().patch<T>(path, body, {
+        ...config,
+        headers: { ...config.headers, "If-Match": `"${version}"`, "X-CSRF-Token": token },
+      });
+      return response.data;
+    } catch (error) {
+      const failure = toApiError(error);
+      if (failure.code !== "CSRF_INVALID" || attempt === 1) throw failure;
+      csrfToken = undefined;
+      await refreshCsrfToken();
+    }
+  }
+  throw new ApiError(403, "CSRF_INVALID", "No pudimos verificar la solicitud.");
+}
+export async function apiPut<T>(path: string, body: unknown = {}, config: AxiosRequestConfig = {}): Promise<T> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const token = csrfToken ?? await refreshCsrfToken();
+    try {
+      const response = await getApiClient().put<T>(path, body, { ...config, headers: { ...config.headers, "X-CSRF-Token": token } });
+      return response.data;
+    } catch (error) {
+      const failure = toApiError(error);
+      if (failure.code !== "CSRF_INVALID" || attempt === 1) throw failure;
+      csrfToken = undefined;
+      await refreshCsrfToken();
+    }
+  }
+  throw new ApiError(403, "CSRF_INVALID", "No pudimos verificar la solicitud.");
+}
+export async function apiPutVersioned<T>(path: string, body: unknown, version: number, config: AxiosRequestConfig = {}): Promise<T> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const token = csrfToken ?? await refreshCsrfToken();
+    try {
+      const response = await getApiClient().put<T>(path, body, {
+        ...config,
+        headers: { ...config.headers, "If-Match": `"${version}"`, "X-CSRF-Token": token },
+      });
+      return response.data;
+    } catch (error) {
+      const failure = toApiError(error);
+      if (failure.code !== "CSRF_INVALID" || attempt === 1) throw failure;
+      csrfToken = undefined;
+      await refreshCsrfToken();
+    }
+  }
+  throw new ApiError(403, "CSRF_INVALID", "No pudimos verificar la solicitud.");
+}
+export async function apiDeleteVersioned<T>(path: string, version: number, config: AxiosRequestConfig = {}): Promise<T> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const token = csrfToken ?? await refreshCsrfToken();
+    try {
+      const response = await getApiClient().delete<T>(path, {
+        ...config,
+        headers: { ...config.headers, "If-Match": `"${version}"`, "X-CSRF-Token": token },
+      });
+      return response.data;
+    } catch (error) {
+      const failure = toApiError(error);
+      if (failure.code !== "CSRF_INVALID" || attempt === 1) throw failure;
+      csrfToken = undefined;
+      await refreshCsrfToken();
+    }
+  }
+  throw new ApiError(403, "CSRF_INVALID", "No pudimos verificar la solicitud.");
+}
 export async function apiDelete<T>(path: string, config: AxiosRequestConfig = {}): Promise<T> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const token = csrfToken ?? await refreshCsrfToken();
@@ -115,6 +209,75 @@ export async function getMembers(organizationId: string, signal?: AbortSignal): 
   try { return (await getApiClient().get<MemberDetailDTO[]>(`/organizations/${encodeURIComponent(organizationId)}/members`, { signal })).data; }
   catch (error) { throw toApiError(error); }
 }
+
+export async function getCustomers(organizationId: string, query: CustomerListInput = {}, signal?: AbortSignal): Promise<CustomerPageDTO> {
+  try {
+    return (await getApiClient().get<CustomerPageDTO>(`/organizations/${encodeURIComponent(organizationId)}/customers`, { params: query, signal })).data;
+  } catch (error) { throw toApiError(error); }
+}
+
+export async function getCustomer(organizationId: string, customerId: string, signal?: AbortSignal): Promise<CustomerDTO> {
+  try {
+    return (await getApiClient().get<CustomerDTO>(`/organizations/${encodeURIComponent(organizationId)}/customers/${encodeURIComponent(customerId)}`, { signal })).data;
+  } catch (error) { throw toApiError(error); }
+}
+
+export const createCustomer = (organizationId: string, input: CreateCustomerInput) =>
+  apiMutation<CustomerDTO>(`/organizations/${encodeURIComponent(organizationId)}/customers`, input);
+
+export const updateCustomer = (organizationId: string, customerId: string, input: UpdateCustomerInput, version: number) =>
+  apiPatchVersioned<CustomerDTO>(`/organizations/${encodeURIComponent(organizationId)}/customers/${encodeURIComponent(customerId)}`, input, version);
+
+export async function getDuplicateCustomerCandidates(organizationId: string, query: { email?: string; phone?: string; excludeId?: string }, signal?: AbortSignal): Promise<DuplicateCustomerCandidatesDTO> {
+  try {
+    return (await getApiClient().get<DuplicateCustomerCandidatesDTO>(`/organizations/${encodeURIComponent(organizationId)}/customers/duplicate-candidates`, { params: query, signal })).data;
+  } catch (error) { throw toApiError(error); }
+}
+
+export async function getServiceCategories(organizationId: string, query: ServiceCategoryListInput = {}, signal?: AbortSignal): Promise<ServiceCategoryPageDTO> {
+  try { return (await getApiClient().get<ServiceCategoryPageDTO>(`/organizations/${encodeURIComponent(organizationId)}/service-categories`, { params: query, signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export const createServiceCategory = (organizationId: string, input: CreateServiceCategoryInput) =>
+  apiMutation<ServiceCategoryDTO>(`/organizations/${encodeURIComponent(organizationId)}/service-categories`, input);
+export const updateServiceCategory = (organizationId: string, categoryId: string, input: UpdateServiceCategoryInput, version: number) =>
+  apiPatchVersioned<ServiceCategoryDTO>(`/organizations/${encodeURIComponent(organizationId)}/service-categories/${encodeURIComponent(categoryId)}`, input, version);
+export async function getServices(organizationId: string, query: ServiceListInput = {}, signal?: AbortSignal): Promise<ServicePageDTO> {
+  try { return (await getApiClient().get<ServicePageDTO>(`/organizations/${encodeURIComponent(organizationId)}/services`, { params: query, signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export async function getService(organizationId: string, serviceId: string, signal?: AbortSignal): Promise<ServiceDTO> {
+  try { return (await getApiClient().get<ServiceDTO>(`/organizations/${encodeURIComponent(organizationId)}/services/${encodeURIComponent(serviceId)}`, { signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export const createService = (organizationId: string, input: CreateServiceInput) =>
+  apiMutation<ServiceDTO>(`/organizations/${encodeURIComponent(organizationId)}/services`, input);
+export const updateService = (organizationId: string, serviceId: string, input: UpdateServiceInput, version: number) =>
+  apiPatchVersioned<ServiceDTO>(`/organizations/${encodeURIComponent(organizationId)}/services/${encodeURIComponent(serviceId)}`, input, version);
+export async function getStaff(organizationId: string, query: StaffListInput = {}, signal?: AbortSignal): Promise<StaffPageDTO> {
+  try { return (await getApiClient().get<StaffPageDTO>(`/organizations/${encodeURIComponent(organizationId)}/staff`, { params: query, signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export async function getStaffMember(organizationId: string, staffMemberId: string, signal?: AbortSignal): Promise<StaffDTO> {
+  try { return (await getApiClient().get<StaffDTO>(`/organizations/${encodeURIComponent(organizationId)}/staff/${encodeURIComponent(staffMemberId)}`, { signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export const createStaffMember = (organizationId: string, input: CreateStaffInput) =>
+  apiMutation<StaffDTO>(`/organizations/${encodeURIComponent(organizationId)}/staff`, input);
+export const updateStaffMember = (organizationId: string, staffMemberId: string, input: UpdateStaffInput, version: number) =>
+  apiPatchVersioned<StaffDTO>(`/organizations/${encodeURIComponent(organizationId)}/staff/${encodeURIComponent(staffMemberId)}`, input, version);
+export async function getStaffMemberServices(organizationId: string, staffMemberId: string, query: StaffServiceListQuery = {}, signal?: AbortSignal): Promise<StaffServicePageDTO> {
+  try { return (await getApiClient().get<StaffServicePageDTO>(`/organizations/${encodeURIComponent(organizationId)}/staff/${encodeURIComponent(staffMemberId)}/services`, { params: query, signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export async function getServiceStaff(organizationId: string, serviceId: string, query: StaffServiceListQuery = {}, signal?: AbortSignal): Promise<StaffServicePageDTO> {
+  try { return (await getApiClient().get<StaffServicePageDTO>(`/organizations/${encodeURIComponent(organizationId)}/services/${encodeURIComponent(serviceId)}/staff`, { params: query, signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export const addStaffToService = (organizationId: string, serviceId: string, staffMemberId: string, version: number) =>
+  apiPutVersioned<StaffServiceMutationDTO>(`/organizations/${encodeURIComponent(organizationId)}/services/${encodeURIComponent(serviceId)}/staff/${encodeURIComponent(staffMemberId)}`, {}, version);
+export const removeStaffFromService = (organizationId: string, serviceId: string, staffMemberId: string, version: number) =>
+  apiDeleteVersioned<StaffServiceRemoveDTO>(`/organizations/${encodeURIComponent(organizationId)}/services/${encodeURIComponent(serviceId)}/staff/${encodeURIComponent(staffMemberId)}`, version);
 
 export const updateMemberRole = (organizationId: string, memberId: string, role: OrganizationRole) =>
   apiPatch<MemberDetailDTO>(`/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(memberId)}`, { role });

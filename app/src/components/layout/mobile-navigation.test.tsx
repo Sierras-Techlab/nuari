@@ -31,6 +31,8 @@ describe("MobileNavigation", () => {
     expect(screen.getByRole("link", { name: "Agenda" }).getAttribute("href")).toBe("/app/agenda");
     expect(screen.getByRole("link", { name: "Agenda" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("link", { name: "Servicios" }).getAttribute("href")).toBe("/app/servicios");
+    expect(screen.getByRole("link", { name: "Profesionales" }).getAttribute("href")).toBe("/app/profesionales");
+    expect(screen.getByRole("link", { name: "Profesionales" }).getAttribute("aria-current")).toBeNull();
     expect(screen.getByRole("link", { name: "Clientes" }).getAttribute("href")).toBe("/app/clientes");
     expect(screen.getByRole("link", { name: "Caja" }).getAttribute("href")).toBe("/app/caja");
     expect(screen.getByRole("link", { name: "Equipo" }).getAttribute("href")).toBe("/app/equipo");

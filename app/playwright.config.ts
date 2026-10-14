@@ -24,6 +24,7 @@ export default defineConfig({
   use: {
     ...devices["Desktop Chrome"],
     baseURL: webOrigin,
+    ...(process.env.E2E_BROWSER_CHANNEL ? { launchOptions: { channel: process.env.E2E_BROWSER_CHANNEL } } : {}),
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

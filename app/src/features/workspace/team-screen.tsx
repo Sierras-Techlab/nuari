@@ -197,7 +197,7 @@ export function TeamScreen() {
 
   return (
     <div className="space-y-7 pb-12">
-      <SectionIntro label="Gestión / Equipo" title="Un equipo conectado." description="Administrá las cuentas que pueden acceder a tu organización y sus permisos." icon={<UsersThree size={15} weight="duotone" />} tone="lavender" />
+      <SectionIntro label="Gestión / Equipo" title="Accesos del equipo." description="Administrá las cuentas que pueden acceder a tu organización, sus invitaciones y permisos. Las fichas del personal operativo se gestionan en Profesionales." icon={<UsersThree size={15} weight="duotone" />} tone="lavender" />
       {notice ? <p role={notice.error ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${notice.error ? "border-[#F1D6D0] bg-[#FFF6F3] text-[#A04439]" : "border-[#DDF6E8] bg-[#EFFBF4] text-[#35645D]"}`}>{notice.message}</p> : null}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
         <SectionCard title="Personas del equipo" detail={`${members.length} ${members.length === 1 ? "cuenta con acceso" : "cuentas con acceso"} a la organización`}>

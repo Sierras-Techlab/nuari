@@ -53,9 +53,12 @@ describe('boundary DTOs', () => {
     expect(await validate(dtoWithNull, { whitelist: true, forbidNonWhitelisted: true })).toEqual([]);
 
     const dtoWithValidEmail = plainToInstance(UpdateOrganizationDto, {
-      email: 'contacto@ejemplo.com',
+      email: 'contacto@ejemplo.com', confirmCurrencyChange: true,
     });
     expect(await validate(dtoWithValidEmail, { whitelist: true, forbidNonWhitelisted: true })).toEqual([]);
+
+    const dtoWithInvalidConfirmation = plainToInstance(UpdateOrganizationDto, { confirmCurrencyChange: null });
+    expect((await validate(dtoWithInvalidConfirmation, { whitelist: true, forbidNonWhitelisted: true })).map(error => error.property)).toEqual(['confirmCurrencyChange']);
 
     const dtoWithInvalidEmail = plainToInstance(UpdateOrganizationDto, {
       email: 'not-an-email',

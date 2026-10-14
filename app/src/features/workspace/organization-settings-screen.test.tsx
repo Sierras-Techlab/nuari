@@ -174,5 +174,24 @@ describe("OrganizationSettingsScreen", () => {
     fireEvent.change(nameInput, { target: { value: "Otro Nombre" } });
     expect(screen.queryByText("El nombre es obligatorio.")).toBeNull();
   });
+
+  it("confirms currency changes and explains when saved prices require an explicit migration", async () => {
+    const { updateOrganization } = await import("@/lib/api/browser");
+    const { ApiError } = await import("@/lib/api/errors");
+    vi.mocked(updateOrganization).mockRejectedValueOnce(new ApiError(409, "CURRENCY_CHANGE_REQUIRES_MIGRATION", "El catálogo contiene importes."));
+    render(<OrganizationSettingsScreen />);
+    await waitFor(() => expect(screen.getByDisplayValue("Estudio de diseño")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("País"), { target: { value: "UY" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+    expect(screen.getByText("¿Confirmar cambio de moneda?")).toBeTruthy();
+    expect(screen.getByText(/no convierte importes guardados/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar cambio" }));
+    await waitFor(() => expect(updateOrganization).toHaveBeenCalledWith("org-1", expect.objectContaining({
+      country: "UY", currency: "UYU", confirmCurrencyChange: true,
+    })));
+    expect(await screen.findByText(/hace falta una migración explícita/i)).toBeTruthy();
+    expect((screen.getByLabelText("País") as HTMLSelectElement).value).toBe("UY");
+    expect(screen.getByDisplayValue("UYU - Peso Uruguayo")).toBeTruthy();
+  });
 });
 

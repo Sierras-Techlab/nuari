@@ -35,13 +35,18 @@ Las entidades y restricciones persistentes detalladas se documentan en el esquem
 ## Servicios
 
 ```text
+Organization --< ServiceCategory --o< Service
 Organization --< Service
-Organization --< StaffMember
-StaffMember --< AvailabilityRule
+Organization --< StaffMember --< StaffService >-- Service
+Organization --< Customer
 Customer --< Appointment
 Appointment >-- Service
 Appointment >-- StaffMember
 ```
+
+El esquema inicial de `Customer`, `ServiceCategory`, `Service`, `StaffMember` y `StaffService` está persistido desde FEAT-003 B1. La categoría de un servicio es opcional. StaffMember es una ficha operativa distinta de OrganizationMember; su `userId` nullable sólo referencia una cuenta global y no crea membresía ni acceso. `StaffService` habilita una combinación profesional–servicio y conserva ambas FK compuestas con `organizationId`.
+
+El catálogo usa selección `CUSTOMER_CHOICE`, `AUTO_ASSIGN` o `NO_ASSIGNMENT`; no calcula disponibilidad ni ejecuta asignación. La modalidad actual es `IN_PERSON`. Los precios usan `Decimal(12,2)` y moneda explícita. Las APIs de categorías, servicios, personal y habilitaciones usan tenant context; las interfaces Clientes, Servicios y Profesionales consumen esas APIs. FK compuestas con `organizationId` impiden asociar categorías, servicios y personal de distintas organizaciones incluso si la escritura no proviene de la API. Un cambio monetario confirmado no convierte importes: se bloquea si existe un precio y, si no existen precios, actualiza atómicamente la moneda de servicios sin precio.
 
 El modelo exacto para turnos con múltiples servicios o recursos se definirá con el flujo piloto. Hasta entonces no se asumirá una cardinalidad que cierre prematuramente esa posibilidad.
 
@@ -92,11 +97,11 @@ La confirmación de Mercado Pago será procesada desde webhooks verificados. Rep
 - Los importes no se representarán con punto flotante binario.
 - La moneda debe ser explícita aun cuando el mercado inicial opere principalmente en ARS.
 - Las marcas temporales persistidas usarán una representación inequívoca y las reglas de negocio deberán considerar la zona horaria de la organización.
-- La política concreta de precisión monetaria y almacenamiento temporal se fijará antes del primer esquema financiero.
+- El precio del catálogo de servicios usa `Decimal(12,2)` y la moneda de la organización; esto no define redondeo, impuestos, FX ni snapshots de ventas/pagos futuros.
 
 ## Restricciones tenant-aware
 
 - Las entidades operativas incluyen `organizationId`.
 - Las claves únicas de negocio normalmente incluyen `organizationId`.
-- Las relaciones entre entidades operativas deben impedir asociaciones entre organizaciones diferentes.
+- Las FK compuestas de categoría-servicio y profesional-servicio impiden asociar entidades de organizaciones diferentes en el esquema inicial.
 - La API obtiene el tenant context de una membresía autorizada, no de un identificador confiado del request.

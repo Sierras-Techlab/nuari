@@ -237,6 +237,7 @@ export function OrganizationSettingsScreen() {
   }, [initialData, formData]);
 
   const slugChanged = formData.slug !== initialData.slug;
+  const currencyChanged = formData.currency !== initialData.currency;
 
   const currentRegion = regionalData[formData.country] || regionalData.AR;
 
@@ -293,14 +294,14 @@ export function OrganizationSettingsScreen() {
 
   function handleSaveClick() {
     if (isSaving || isLoading) return;
-    if (slugChanged) {
+    if (slugChanged || currencyChanged) {
       setShowModal(true);
     } else {
       executeSave();
     }
   }
 
-  async function executeSave() {
+  async function executeSave(confirmCurrencyChange = false) {
     if (!snapshot?.activeOrganizationId) return;
     setIsSaving(true);
     setFieldErrors({});
@@ -338,6 +339,7 @@ export function OrganizationSettingsScreen() {
           payload.currency = formData.currency;
         }
       }
+      if (currencyChanged) payload.confirmCurrencyChange = confirmCurrencyChange;
       if (formData.state !== initialData.state) {
         payload.state = formData.state;
       }
@@ -378,7 +380,10 @@ export function OrganizationSettingsScreen() {
       if (err.fieldErrors) {
         setFieldErrors(err.fieldErrors);
       }
-      showToast(err.message || "Error al guardar la configuración", "error");
+      if (err.code === "CURRENCY_CHANGE_REQUIRES_MIGRATION") setShowModal(false);
+      showToast(err.code === "CURRENCY_CHANGE_REQUIRES_MIGRATION"
+        ? "No se puede cambiar la moneda porque el catálogo ya contiene importes. Los importes existentes no se convierten; hace falta una migración explícita."
+        : err.message || "Error al guardar la configuración", "error");
     } finally {
       setIsSaving(false);
     }
@@ -967,7 +972,7 @@ export function OrganizationSettingsScreen() {
         ))}
       </div>
 
-      {/* Modal de confirmación para cambio de Slug */}
+      {/* Modal de confirmación para cambio de enlace o moneda */}
       <div
         className={`${styles.modalOverlay} ${
           showModal ? styles.modalOverlayActive : ""
@@ -987,9 +992,9 @@ export function OrganizationSettingsScreen() {
               <Warning size={28} />
             </div>
             <h3 className="mb-2 text-xl font-bold text-[#182026]">
-              ¿Cambiar enlace público?
+              {currencyChanged ? "¿Confirmar cambio de moneda?" : "¿Cambiar enlace público?"}
             </h3>
-            <p className="mb-4 text-sm leading-relaxed text-[#667078]">
+            {slugChanged ? <p className="mb-4 text-sm leading-relaxed text-[#667078]">
               Estás a punto de cambiar el identificador de{" "}
               <strong className="rounded border border-[#E4E9E7] bg-[#F8FAF9] px-1 text-[#182026]">
                 {initialData.slug}
@@ -999,14 +1004,15 @@ export function OrganizationSettingsScreen() {
                 {formData.slug}
               </strong>
               .
-            </p>
-            <div className="rounded-lg border border-[#E4E9E7] bg-[#F8FAF9] p-3">
+            </p> : null}
+            {slugChanged ? <div className="rounded-lg border border-[#E4E9E7] bg-[#F8FAF9] p-3">
               <p className="text-xs font-medium text-[#667078]">
                 <Info size={14} weight="fill" className="mr-1 inline text-[#182026]" />
                 Cualquier cliente con el enlace anterior ya no podrá acceder a tu agenda
                 actual. Deberás compartirles el nuevo enlace.
               </p>
-            </div>
+            </div> : null}
+            {currencyChanged ? <div className="rounded-lg border border-[#FFF1E2] bg-[#FFF7EE] p-3"><p className="text-xs font-medium leading-5 text-[#805B35]">La moneda cambia según el país. Esta operación no convierte importes guardados. Si el catálogo ya tiene precios, el servidor bloqueará el cambio y hará falta una migración explícita.</p></div> : null}
           </div>
           <div className="flex flex-col justify-end gap-3 border-t border-[#E4E9E7] bg-[#F8FAF9]/50 px-6 py-5 sm:flex-row sm:px-8">
             <button
@@ -1018,10 +1024,10 @@ export function OrganizationSettingsScreen() {
             </button>
             <button
               type="button"
-              onClick={executeSave}
+              onClick={() => void executeSave(currencyChanged)}
               className="w-full rounded-xl border border-transparent bg-[#182026] px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-[#2A3742] sm:w-auto"
             >
-              Sí, cambiar enlace
+              {currencyChanged ? "Confirmar cambio" : "Sí, cambiar enlace"}
             </button>
           </div>
         </div>

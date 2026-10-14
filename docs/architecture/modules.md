@@ -16,15 +16,21 @@ Posee `OrganizationMember`, roles por organización y resolución del tenant con
 
 Responsable de usuarios, credenciales, sesiones, tokens de verificación/recuperación y autenticación. Expone identidad y capacidades de sesión; no asigna organización ni rol global. La membresía y su rol son propiedad de Organizations, en línea con ADR-005.
 
-Nuari implementa autenticación propia en NestJS conforme a [`ADR-005`](decisions/ADR-005-custom-authentication.md). La implementación actual de identidad, organizaciones y suscripciones sigue en validación y no equivale a una feature lista para publicación.
+Nuari implementa autenticación propia en NestJS conforme a [`ADR-005`](decisions/ADR-005-custom-authentication.md). FEAT-001 y FEAT-002 están cerradas tras validación manual de sus flujos principales; las limitaciones de correo y staging siguen documentadas en el snapshot y los problemas conocidos. FEAT-003 B1–B10 implementaron el esquema inicial, permisos base, APIs tenant-aware de clientes/categorías/servicios/personal, habilitaciones profesional–servicio y las pantallas persistentes de Clientes, Servicios y Profesionales, según TASK-09. La Agenda continúa usando datos locales de demostración.
 
 ### Staff
 
-Responsable de integrantes operativos del negocio y su posible vínculo con usuarios autenticables.
+Responsable de las fichas laborales del negocio y las habilitaciones de los servicios que puede prestar cada profesional. `StaffMember` es distinto de `OrganizationMember`; su vínculo `userId` nullable es sólo una referencia opcional a una identidad global y no crea cuenta, sesión ni membresía. `StaffModule` entrega directorio básico y ficha administrativa con permisos diferenciados; cambios de habilitaciones coordinan Staff y ServiceCatalog mediante interfaces explícitas, transacción y tenant context.
 
 ### Customers
 
 Responsable de los clientes propios de cada organización, sus datos de contacto y su historial accesible mediante interfaces autorizadas.
+
+El módulo NestJS `CustomersModule` implementa listado paginado, ficha, alta, edición versionada y candidatos no bloqueantes; aplica tenant, permisos y acceso comercial, y proyecta notes según rol. No exporta consultas globales por contacto.
+
+### ServiceCatalogModule API
+
+El módulo NestJS `ServiceCatalogModule` administra categorías y servicios con tenant context, filtros/paginación, precios exactos, ETag/If-Match, archivo lógico y auditoría acotada. `ServiceCatalogService.requireService(ctx,id,tx?)` ofrece una consulta pública tenant-aware para módulos que necesiten validar el servicio. La coordinación de moneda permanece en Organizations: ambos casos de uso bloquean Organization y comparten la misma transacción, sin dependencia circular.
 
 ### Sales
 

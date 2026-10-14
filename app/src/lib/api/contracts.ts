@@ -18,6 +18,7 @@ export type OrganizationDTO = {
   address?: string;
   timezone: string;
   currency: string;
+  confirmCurrencyChange?: boolean;
   logoUrl?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -88,7 +89,55 @@ export type OrganizationInput = { name: string; slug: string; businessType: Busi
 export type OrganizationResult = { organization: OrganizationDTO; membership: MembershipDTO; subscription: SubscriptionDTO };
 export type WorkspaceDTO = { organization: OrganizationDTO; membership: MembershipDTO; access: Access; evaluatedAt: string };
 export type SubscriptionResult = { subscription: SubscriptionDTO; access: Access };
-export type ApiErrorCode = "VALIDATION_ERROR" | "INVALID_TOKEN" | "INVALID_IDEMPOTENCY_KEY" | "UNAUTHENTICATED" | "INVALID_CREDENTIALS" | "CSRF_INVALID" | "EMAIL_UNVERIFIED" | "TRIAL_ALREADY_USED" | "PERMISSION_DENIED" | "SUBSCRIPTION_REQUIRED" | "ORGANIZATION_NOT_FOUND" | "SLUG_TAKEN" | "ONBOARDING_ALREADY_COMPLETED" | "IDEMPOTENCY_CONFLICT" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "CONTEXT_CHANGED" | "CANNOT_REMOVE_LAST_OWNER" | "MEMBER_NOT_FOUND" | "INVITATION_NOT_FOUND" | "ALREADY_MEMBER" | "EMAIL_MISMATCH" | "INVALID_INVITATION";
+export type CustomerDTO = {
+  id: string; organizationId: string; name: string; phone: string | null; email: string | null;
+  active: boolean; version: number; createdAt: string; updatedAt: string; notes?: string | null;
+};
+export type CustomerSummaryDTO = Omit<CustomerDTO, "notes">;
+export type CustomerPageDTO = { items: CustomerSummaryDTO[]; pageInfo: { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; windowLimitReached: boolean } };
+export type CustomerListInput = { limit?: number; offset?: number; status?: "active" | "inactive" | "all"; q?: string };
+export type CreateCustomerInput = { name: string; phone?: string | null; email?: string | null; notes?: string | null };
+export type UpdateCustomerInput = Partial<CreateCustomerInput> & { active?: boolean };
+export type DuplicateCustomerCandidatesDTO = { items: CustomerSummaryDTO[]; hasMore: boolean };
+export type ServiceCategoryDTO = {
+  id: string; organizationId: string; name: string; active: boolean; sortOrder: number; version: number; createdAt: string; updatedAt: string;
+};
+export type ServiceDTO = {
+  id: string; organizationId: string; name: string; description: string | null; durationMinutes: number;
+  pricingType: "FIXED" | "FROM" | "ON_REQUEST"; price: string | null; currency: string; categoryId: string | null;
+  active: boolean; sortOrder: number; staffSelectionMode: "CUSTOMER_CHOICE" | "AUTO_ASSIGN" | "NO_ASSIGNMENT";
+  modality: "IN_PERSON"; version: number; createdAt: string; updatedAt: string;
+};
+export type StaffSummaryDTO = {
+  id: string; organizationId: string; name: string; active: boolean; version: number; createdAt: string; updatedAt: string;
+};
+export type StaffDTO = StaffSummaryDTO & { email: string | null; phone: string | null; userId: string | null };
+export type StaffServiceDTO = {
+  organizationId: string; serviceId: string; staffMemberId: string; createdAt: string;
+  staff: { id: string; name: string; active: boolean }; service: { id: string; name: string; active: boolean };
+};
+export type OperationalPageInfo = { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; windowLimitReached: boolean };
+export type ServicePageDTO = { items: ServiceDTO[]; pageInfo: OperationalPageInfo };
+export type ServiceCategoryPageDTO = { items: ServiceCategoryDTO[]; pageInfo: OperationalPageInfo };
+export type StaffPageDTO = { items: StaffSummaryDTO[]; pageInfo: OperationalPageInfo };
+export type StaffServicePageDTO = { items: StaffServiceDTO[]; pageInfo: OperationalPageInfo };
+export type CreateServiceCategoryInput = { name: string; sortOrder?: number };
+export type UpdateServiceCategoryInput = Partial<CreateServiceCategoryInput> & { active?: boolean };
+export type CreateServiceInput = {
+  name: string; description?: string | null; durationMinutes: number; pricingType?: ServiceDTO["pricingType"];
+  price?: string | null; categoryId?: string | null; sortOrder?: number;
+  staffSelectionMode: ServiceDTO["staffSelectionMode"]; modality?: ServiceDTO["modality"];
+};
+export type UpdateServiceInput = Partial<CreateServiceInput> & { active?: boolean };
+export type ServiceListInput = { limit?: number; offset?: number; status?: "active" | "inactive" | "all"; q?: string; categoryId?: string; staffSelectionMode?: ServiceDTO["staffSelectionMode"] };
+export type ServiceCategoryListInput = { limit?: number; offset?: number; status?: "active" | "inactive" | "all"; q?: string };
+export type StaffListInput = { limit?: number; offset?: number; status?: "active" | "inactive" | "all"; q?: string };
+export type StaffServiceListQuery = { limit?: number; offset?: number; status?: "active" | "inactive" | "all" };
+export type CreateStaffInput = { name: string; email?: string | null; phone?: string | null };
+export type UpdateStaffInput = Partial<CreateStaffInput> & { active?: boolean };
+export type StaffServiceMutationDTO = { association: StaffServiceDTO; serviceVersion: number };
+export type StaffServiceRemoveDTO = { serviceVersion: number };
+export type ApiErrorCode = "VALIDATION_ERROR" | "INVALID_TOKEN" | "INVALID_IDEMPOTENCY_KEY" | "UNAUTHENTICATED" | "INVALID_CREDENTIALS" | "CSRF_INVALID" | "EMAIL_UNVERIFIED" | "TRIAL_ALREADY_USED" | "PERMISSION_DENIED" | "SUBSCRIPTION_REQUIRED" | "ORGANIZATION_NOT_FOUND" | "SLUG_TAKEN" | "ONBOARDING_ALREADY_COMPLETED" | "IDEMPOTENCY_CONFLICT" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "CONTEXT_CHANGED" | "CANNOT_REMOVE_LAST_OWNER" | "MEMBER_NOT_FOUND" | "INVITATION_NOT_FOUND" | "ALREADY_MEMBER" | "EMAIL_MISMATCH" | "INVALID_INVITATION" | "CUSTOMER_NOT_FOUND" | "SERVICE_NOT_FOUND" | "SERVICE_CATEGORY_NOT_FOUND" | "STAFF_MEMBER_NOT_FOUND" | "SERVICE_NAME_TAKEN" | "SERVICE_CATEGORY_NAME_TAKEN" | "RELATED_ENTITY_INACTIVE" | "CURRENCY_CHANGE_REQUIRES_MIGRATION" | "VERSION_CONFLICT";
 
 export type ApiErrorDTO = { code: ApiErrorCode; message: string; fieldErrors?: Record<string, string[]> };
 const errorCodes = new Set<string>([
@@ -116,6 +165,15 @@ const errorCodes = new Set<string>([
   "ALREADY_MEMBER",
   "EMAIL_MISMATCH",
   "INVALID_INVITATION",
+  "CUSTOMER_NOT_FOUND",
+  "SERVICE_NOT_FOUND",
+  "SERVICE_CATEGORY_NOT_FOUND",
+  "STAFF_MEMBER_NOT_FOUND",
+  "SERVICE_NAME_TAKEN",
+  "SERVICE_CATEGORY_NAME_TAKEN",
+  "RELATED_ENTITY_INACTIVE",
+  "CURRENCY_CHANGE_REQUIRES_MIGRATION",
+  "VERSION_CONFLICT",
 ]);
 
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null; }

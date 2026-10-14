@@ -14,13 +14,21 @@ El objetivo general es reemplazar un registro manual o Excel, pero todavía no s
 
 ### Persistencia del Turnero
 
-Las rutas de Turnero permiten gestionar datos durante la sesión del navegador, pero sus cambios se reinician al recargar y no representan turnos, movimientos de caja, clientes ni usuarios reales. La identidad, organización, membresía y protección de `/app/**` sí están implementadas en FEAT-001; falta definir e implementar persistencia y autorización de cada módulo operativo antes de usar esos datos con terceros.
+Agenda y Caja todavía usan datos operativos locales que se reinician al recargar. Clientes, Servicios, Categorías, Profesionales y habilitaciones ya usan API tenant-aware. B1 creó y migró el esquema base en Neon dev; B2 agregó permisos; B3–B6 implementaron los módulos API; B7–B9 integraron Clientes, Servicios y Profesionales en sus rutas separadas. `/app/equipo` administra accesos. La Agenda conserva catálogo demo local y no está conectada a citas persistidas. Antes de usar el producto con datos de terceros falta cerrar la política de retención.
 
 ### Alcance funcional del Turnero
 
-La interfaz ya muestra Servicios, Clientes, Caja y Equipo con operaciones locales, pero sus modelos, permisos y flujos definitivos no están aprobados para el primer corte. Caja no equivale a ventas o pagos, y los integrantes de Equipo no tienen acceso real. Confirmar prioridad y reglas con el piloto según [`TASK-04`](../docs/tasks/TASK-04-turnero-workspace-front.md). La lista de espera sigue como candidata posterior. Un módulo futuro de hotelería o reservas por recursos requerirá una definición separada.
+Servicios y Caja conservan demostraciones locales; Clientes, Servicios y Profesionales ya consumen persistencia API. Equipo administra miembros con acceso real según TASK-08. [TASK-09 — FEAT-003](../docs/tasks/TASK-09-feat-003-operational-catalog.md) define el núcleo persistente de clientes, catálogo y personal. B1–B10 cubren esquema, permisos, APIs, pantallas y validación cruzada focalizada. Caja no equivale a ventas o pagos. La Agenda sigue siendo demostración local; la lista de espera, hotelería y reservas por recursos requieren definiciones posteriores. El piloto y su métrica siguen pendientes.
 
 Las fichas de Clientes todavía no están vinculadas por identificador a los turnos: el formulario actual toma nombre y teléfono como datos del turno. Definir esa relación con el modelo de dominio y la API antes de usar historial de clientes real.
+
+### Dependencias futuras por empleado
+
+TASK-09 sección 4.5 documenta la dirección aprobada para ventas/servicios desde móviles, fichaje y estadísticas opcionales por organización, capacidades configurables sin elevar EMPLOYEE a ADMIN y ejecutante separado del actor de carga. No se implementan en FEAT-003. Ventas, asistencia y reportes deberán definir configuración, acceso propio/equipo, registro por terceros, métricas, privacidad y correcciones. Ya están aprobadas notas internas para OWNER/ADMIN, archivo lógico sin perder historial y privacidad del personal con datos básicos visibles y sensibles sólo OWNER/ADMIN. Archivo/reactivación está aprobado sólo para OWNER/ADMIN; EMPLOYEE no modifica el estado.
+
+### Detalles restantes de FEAT-003
+
+La tabla de producto cerró duplicados con advertencia por correo/teléfono sin bloqueo, duración entera 5–720, configuración de profesional por servicio y sección operativa independiente conservando rutas de Clientes/Servicios. No reabrir esas decisiones. El cierre técnico también define modos y default condicional, IN_PERSON inicial con remoto futuro, /app/profesionales con etiqueta Profesionales y /app/equipo para accesos, archivo OWNER/ADMIN y política monetaria. No reabrirlos. FEAT-003 B1–B10 están implementados; piloto, métrica y retención siguen abiertos. Las APIs operativas aplican la matriz B2. La pantalla Profesionales muestra habilitaciones en la ficha; las modificaciones se hacen desde el detalle de Servicios. No se hizo revisión manual de diseño Canvas en desktop/móvil ni despliegue desde cero; esos límites constan en TASK-09.
 
 ### Promesas de la landing antes del piloto
 
@@ -52,7 +60,7 @@ El 2026-10-12 `npm audit` de `app/` reportó seis vulnerabilidades, incluida una
 
 ### Política monetaria y temporal
 
-Antes de implementar ventas o pagos se debe decidir precisión de importes, estrategia de redondeo, moneda y manejo de zona horaria de la organización. Hoy el filtro inicial de Caja usa la fecha local del navegador y cada movimiento manual exige una fecha explícita; al conectarlo a la API, la jornada debe seguir la zona horaria definida para la organización.
+Están aprobados Decimal(12,2), ausencia de conversión automática, confirmación de todo cambio monetario efectivo y bloqueo ante importes persistidos hasta una migración explícita, incluso vía country y con precios cero/inactivos. B4 implementa `confirmCurrencyChange`, sincronización transaccional de metadata en servicios sin precio y locks ante alta/primer precio concurrentes. Configuración solicita confirmación antes del cambio monetario; cuando hay importes, mantiene el formulario y explica que falta una migración explícita. Ventas y pagos deberán definir además redondeo de totales, impuestos y condiciones históricas; no quedan resueltos por el catálogo. Hoy el filtro inicial de Caja usa la fecha local del navegador y cada movimiento manual exige una fecha explícita; al conectarlo a la API, la jornada debe seguir la zona horaria definida para la organización.
 
 ### Row-Level Security
 

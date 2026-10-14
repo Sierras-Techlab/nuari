@@ -55,6 +55,29 @@ export const invitationDto = (inv: { id: string; organizationId: string; email: 
 });
 export const onboardingRequestHash = (input: CreateOrganizationDto): string => sha256(JSON.stringify({ name: input.name, slug: input.slug, businessType: input.businessType, planCode: input.planCode }));
 
+const operationalAuditActions = [
+  'CUSTOMER_CREATED', 'CUSTOMER_UPDATED', 'CUSTOMER_ARCHIVED', 'CUSTOMER_REACTIVATED',
+  'SERVICE_CATEGORY_CREATED', 'SERVICE_CATEGORY_UPDATED', 'SERVICE_CATEGORY_ARCHIVED', 'SERVICE_CATEGORY_REACTIVATED',
+  'SERVICE_CREATED', 'SERVICE_UPDATED', 'SERVICE_ARCHIVED', 'SERVICE_REACTIVATED',
+  'STAFF_MEMBER_CREATED', 'STAFF_MEMBER_UPDATED', 'STAFF_MEMBER_ARCHIVED', 'STAFF_MEMBER_REACTIVATED',
+  'STAFF_SERVICE_ASSIGNED', 'STAFF_SERVICE_UNASSIGNED',
+] as const;
+const operationalAuditFields = [
+  'name', 'phone', 'email', 'notes', 'description', 'durationMinutes', 'pricingType', 'price',
+  'currency', 'categoryId', 'active', 'sortOrder', 'staffSelectionMode', 'modality', 'staffMemberId', 'serviceId',
+] as const;
+
+export type OperationalAuditAction = typeof operationalAuditActions[number];
+export type OperationalAuditField = typeof operationalAuditFields[number];
+
+export type OperationalAuditEntry = {
+  organizationId: string;
+  actorUserId: string;
+  action: OperationalAuditAction;
+  targetId: string;
+  changedFields?: readonly OperationalAuditField[];
+};
+
 @Injectable()
 export class OrganizationsService {
   private readonly logger = new Logger(OrganizationsService.name);
@@ -73,6 +96,21 @@ export class OrganizationsService {
     const member = await tx.organizationMember.findFirst({ where: { userId, organizationId, status: 'ACTIVE' }, include: { organization: true } });
     if (!member) throw new ApiError(404, 'ORGANIZATION_NOT_FOUND', 'No se encontró la organización.');
     return member;
+  }
+  async recordOperationalAudit(tx: TransactionContext, entry: OperationalAuditEntry): Promise<void> {
+    if (!operationalAuditActions.includes(entry.action)) throw new TypeError('Invalid operational audit action.');
+    const changedFields = [...(entry.changedFields ?? [])];
+    if (changedFields.some(field => !operationalAuditFields.includes(field))) throw new TypeError('Invalid operational audit field.');
+    await tx.organizationAuditLog.create({
+      data: {
+        organizationId: entry.organizationId,
+        actorUserId: entry.actorUserId,
+        action: entry.action,
+        targetId: entry.targetId,
+        metadata: JSON.stringify({ changedFields }),
+        createdAt: this.clock.now(),
+      },
+    });
   }
   private async eligibility(user: User, hasMembers: boolean, hasInactiveMembership: boolean, tx: TransactionContext) {
     if (hasMembers) return { canCreateOrganization: false, reason: 'HAS_MEMBERSHIP' as const };
@@ -163,28 +201,6 @@ export class OrganizationsService {
       throw new ApiError(403, 'PERMISSION_DENIED', 'Solo el propietario (OWNER) puede modificar el enlace permanente (slug).');
     }
 
-    const currentCountry = input.country !== undefined ? input.country : (member.organization.country ?? 'AR');
-    const countryKey = currentCountry as SupportedCountry;
-    const regional = REGIONAL_CONFIG[countryKey];
-
-    if (!regional) {
-      throw new ApiError(400, 'VALIDATION_ERROR', 'El país seleccionado no es válido.', {
-        country: ['Seleccioná un país admitido (AR, UY, CL, BR, MX, CO, PE).'],
-      });
-    }
-
-    if (input.currency !== undefined && input.currency !== regional.currency) {
-      throw new ApiError(400, 'VALIDATION_ERROR', 'La moneda debe corresponder al país seleccionado.', {
-        currency: [`La moneda para ${currentCountry} debe ser ${regional.currency}.`],
-      });
-    }
-
-    if (input.timezone !== undefined && !regional.timezones.includes(input.timezone as never)) {
-      throw new ApiError(400, 'VALIDATION_ERROR', 'La zona horaria no es válida para el país seleccionado.', {
-        timezone: ['Elegí una zona horaria válida para el país.'],
-      });
-    }
-
     if (input.logoUrl !== undefined && input.logoUrl !== null && input.logoUrl.trim() !== '' && input.logoUrl !== member.organization.logoUrl) {
       throw new ApiError(400, 'VALIDATION_ERROR', 'La carga directa de logoUrl estará disponible próximamente.', {
         logoUrl: ['El almacenamiento de archivos aún no está habilitado.'],
@@ -202,36 +218,83 @@ export class OrganizationsService {
     if (input.email !== undefined) dataToUpdate.email = input.email === '' ? null : input.email;
     if (input.phone !== undefined) dataToUpdate.phone = input.phone === '' ? null : input.phone;
     if (input.website !== undefined) dataToUpdate.website = input.website === '' ? null : input.website;
-    if (input.country !== undefined) {
-      dataToUpdate.country = input.country;
-      if (input.currency === undefined) {
-        dataToUpdate.currency = regional.currency;
-      }
-      if (input.timezone === undefined && !regional.timezones.includes(member.organization.timezone as never)) {
-        dataToUpdate.timezone = regional.timezones[0];
-      }
-    }
+    if (input.country !== undefined) dataToUpdate.country = input.country;
     if (input.state !== undefined) dataToUpdate.state = input.state === '' ? null : input.state;
     if (input.city !== undefined) dataToUpdate.city = input.city === '' ? null : input.city;
     if (input.zip !== undefined) dataToUpdate.zip = input.zip === '' ? null : input.zip;
     if (input.address !== undefined) dataToUpdate.address = input.address === '' ? null : input.address;
     if (input.timezone !== undefined) dataToUpdate.timezone = input.timezone;
-    if (input.currency !== undefined) dataToUpdate.currency = input.currency;
     if (input.logoUrl !== undefined) dataToUpdate.logoUrl = (input.logoUrl === '' || input.logoUrl === null) ? null : input.logoUrl;
 
     try {
       return await this.db.$transaction(async (tx) => {
+        const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "Organization" WHERE "id" = ${member.organizationId}::uuid FOR UPDATE`;
+        if (!locked.length) throw new ApiError(404, 'ORGANIZATION_NOT_FOUND', 'No se encontró la organización.');
+        const current = await tx.organization.findUnique({ where: { id: member.organizationId } });
+        if (!current) throw new ApiError(404, 'ORGANIZATION_NOT_FOUND', 'No se encontró la organización.');
+
+        const currentCountry = input.country ?? current.country ?? 'AR';
+        const regional = REGIONAL_CONFIG[currentCountry as SupportedCountry];
+        if (!regional) {
+          throw new ApiError(400, 'VALIDATION_ERROR', 'El país seleccionado no es válido.', {
+            country: ['Seleccioná un país admitido (AR, UY, CL, BR, MX, CO, PE).'],
+          });
+        }
+        if (input.currency !== undefined && input.currency !== regional.currency) {
+          throw new ApiError(400, 'VALIDATION_ERROR', 'La moneda debe corresponder al país seleccionado.', {
+            currency: [`La moneda para ${currentCountry} debe ser ${regional.currency}.`],
+          });
+        }
+        if (input.timezone !== undefined && !regional.timezones.includes(input.timezone as never)) {
+          throw new ApiError(400, 'VALIDATION_ERROR', 'La zona horaria no es válida para el país seleccionado.', {
+            timezone: ['Elegí una zona horaria válida para el país.'],
+          });
+        }
+
+        const effectiveCurrency = input.currency ?? (input.country !== undefined ? regional.currency : current.currency);
+        const currencyChanged = effectiveCurrency !== current.currency;
+        if (currencyChanged) {
+          if (input.confirmCurrencyChange !== true) {
+            throw new ApiError(400, 'VALIDATION_ERROR', 'Confirmá el cambio efectivo de moneda para continuar.', {
+              confirmCurrencyChange: ['Confirmá explícitamente el cambio de moneda.'],
+            });
+          }
+          const persistedAmount = await tx.service.findFirst({
+            where: { organizationId: member.organizationId, price: { not: null } },
+            select: { id: true },
+          });
+          if (persistedAmount) {
+            throw new ApiError(409, 'CURRENCY_CHANGE_REQUIRES_MIGRATION', 'No se puede cambiar la moneda mientras existan importes guardados.');
+          }
+          dataToUpdate.currency = effectiveCurrency;
+        }
+
+        if (input.country !== undefined) {
+          dataToUpdate.country = input.country;
+          if (input.timezone === undefined && !regional.timezones.includes(current.timezone as never)) {
+            dataToUpdate.timezone = regional.timezones[0];
+          }
+        }
+        if (input.timezone !== undefined) dataToUpdate.timezone = input.timezone;
+
         const updated = await tx.organization.update({
           where: { id: member.organizationId },
           data: dataToUpdate,
         });
 
+        if (currencyChanged) {
+          await tx.service.updateMany({
+            where: { organizationId: member.organizationId, price: null },
+            data: { currency: effectiveCurrency, version: { increment: 1 }, updatedAt: this.clock.now() },
+          });
+        }
+
         const sensitiveChanges: string[] = [];
-        if (input.slug !== undefined && input.slug !== member.organization.slug) sensitiveChanges.push(`slug:${input.slug}`);
-        if (input.name !== undefined && input.name !== member.organization.name) sensitiveChanges.push(`name:${input.name}`);
-        if (input.country !== undefined && input.country !== member.organization.country) sensitiveChanges.push(`country:${input.country}`);
-        if (input.timezone !== undefined && input.timezone !== member.organization.timezone) sensitiveChanges.push(`timezone:${input.timezone}`);
-        if (input.currency !== undefined && input.currency !== member.organization.currency) sensitiveChanges.push(`currency:${input.currency}`);
+        if (input.slug !== undefined && input.slug !== current.slug) sensitiveChanges.push(`slug:${input.slug}`);
+        if (input.name !== undefined && input.name !== current.name) sensitiveChanges.push(`name:${input.name}`);
+        if (input.country !== undefined && input.country !== current.country) sensitiveChanges.push(`country:${input.country}`);
+        if (input.timezone !== undefined && input.timezone !== current.timezone) sensitiveChanges.push(`timezone:${input.timezone}`);
+        if (currencyChanged) sensitiveChanges.push(`currency:${effectiveCurrency}`);
 
         await tx.organizationAuditLog.create({
           data: {
