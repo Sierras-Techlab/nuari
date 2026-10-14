@@ -14,7 +14,7 @@ const sections = [
   { href: "/app/servicios", title: "Servicios", description: "Definí opciones y duraciones para tus citas.", icon: <SquaresFour size={22} />, tone: "blue" },
   { href: "/app/clientes", title: "Clientes", description: "Mantené a mano sus datos de contacto.", icon: <AddressBook size={22} />, tone: "lavender" },
   { href: "/app/caja", title: "Caja", description: "Registrá y consultá movimientos manuales.", icon: <Wallet size={22} />, tone: "amber" },
-  { href: "/app/equipo", title: "Equipo", description: "Organizá profesionales y administración.", icon: <UsersThree size={22} />, tone: "mint" },
+  { href: "/app/equipo", title: "Equipo", description: "Administrá las cuentas con acceso a tu organización.", icon: <UsersThree size={22} />, tone: "mint" },
 ] as const;
 
 export default async function InternalHomePage() {

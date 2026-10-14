@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { MembersScreen } from "@/features/workspace/members-screen";
 import { guardPage } from "@/lib/auth/server";
 import { AccessError } from "@/features/access/access-error";
 
@@ -11,5 +11,5 @@ export const metadata: Metadata = {
 
 export default async function MembersPage() {
   if (!(await guardPage("business"))) return <AccessError />;
-  return <MembersScreen />;
+  redirect("/app/equipo");
 }

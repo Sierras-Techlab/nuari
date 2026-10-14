@@ -1,6 +1,6 @@
 # Problemas conocidos y decisiones abiertas
 
-- Actualizado: 2026-10-12
+- Actualizado: 2026-10-14
 
 ## Decisiones de producto abiertas
 
@@ -12,11 +12,9 @@ Se eligieron barberías y negocios de servicios similares como segmento inicial 
 
 El objetivo general es reemplazar un registro manual o Excel, pero todavía no se definieron el flujo exacto, el período de prueba ni la métrica cuantitativa de éxito.
 
-### Frontend sin persistencia
+### Persistencia del Turnero
 
-Las rutas internas de Turnero permiten gestionar datos durante la sesión del navegador. Sus cambios se reinician al recargar y no representan turnos, movimientos de caja, clientes ni usuarios reales. A pedido de producto se quitaron los rótulos visibles de demostración; antes de usar el espacio con terceros se necesitan identidad, membresía, persistencia, autorización y validación de disponibilidad en la API.
-
-El flujo de [`TASK-05`](../docs/tasks/TASK-05-onboarding-front.md) añade navegación visual desde registro al onboarding y luego a `/app`. No crea cuenta, organización ni membresía; las selecciones del onboarding se pierden al salir/recargar y no modifican Turnero. El enlace mostrado no se reserva ni tiene ruta pública. Todas estas rutas siguen sin protección por sesión.
+Las rutas de Turnero permiten gestionar datos durante la sesión del navegador, pero sus cambios se reinician al recargar y no representan turnos, movimientos de caja, clientes ni usuarios reales. La identidad, organización, membresía y protección de `/app/**` sí están implementadas en FEAT-001; falta definir e implementar persistencia y autorización de cada módulo operativo antes de usar esos datos con terceros.
 
 ### Alcance funcional del Turnero
 
@@ -26,13 +24,13 @@ Las fichas de Clientes todavía no están vinculadas por identificador a los tur
 
 ### Promesas de la landing antes del piloto
 
-La landing muestra capacidades, planes con importes concretos y un selector mensual/anual sin comportamiento. Registro, login y onboarding son sólo visuales; los tipos de negocio, prestaciones y prueba de 14 días del onboarding no activan suscripciones ni aprueban nuevos módulos. Antes de publicar la página como oferta comercial, alinear el mensaje, precios y llamadas a la acción con el alcance aprobado y el estado real del producto. Los textos de Términos y Política de Privacidad del formulario de registro tampoco enlazan documentos.
+La landing muestra capacidades, planes con importes concretos y un selector mensual/anual sin comportamiento. Registro, login, onboarding y la prueba de 14 días ya están conectados al backend; antes de publicar la página como oferta comercial, alinear capacidades, precios y llamadas a la acción con el alcance aprobado y el estado real del producto. Los textos de Términos y Política de Privacidad del formulario de registro tampoco enlazan documentos.
 
 ## Decisiones técnicas abiertas
 
 ### Credenciales y ambiente Neon
 
-La configuración pooled/direct y la generación del cliente fueron verificadas, pero todavía no se proporcionó un proyecto Neon ni credenciales. Falta validar una conexión real, la región elegida y el primer flujo de migración antes de crear modelos de dominio.
+La conexión a Neon dev, configuración pooled/direct y migraciones de FEAT-001/FEAT-002 fueron ejecutadas y verificadas en sus tareas. No asumir que la base de desarrollo representa producción; antes de un despliegue, confirmar el proyecto, región, credenciales y procedimiento de migración del ambiente destino.
 
 ### Advisory de Prisma CLI
 
@@ -46,7 +44,7 @@ Se acordó desplegar NestJS como proceso o contenedor, pero no se eligió entre 
 
 ### Autenticación
 
-La corrección Fase 1 (2026-10-13) validó contra PostgreSQL aislado el registro con retorno, sesión automática, confirmación idempotente, expiración/consumo, reenvío concurrente y preservación del token ante fallo del adaptador. Siguen pendientes Playwright E2E del flujo completo, la revisión amplia de races/rate limits, correo real y validación de cookies/proxies/transporte en staging. El dispatcher actual sólo conoce el resultado del adaptador en memoria: no garantiza entrega final, rebotes ni reintentos durables; resolverlo requiere una decisión posterior de outbox/cola y queda fuera de esta fase. No declarar FEAT-001/FEAT-002 publicadas por estas pruebas focalizadas.
+FEAT-001 y FEAT-002 se cerraron el 2026-10-14 después de validar manualmente los flujos principales. El reenvío usa la infraestructura existente, pero el dispatcher en memoria no garantiza entrega final, rebotes ni reintentos durables; evaluar transporte durable/outbox si la operación lo requiere. La validación manual no sustituye una verificación de correo real, cookies, proxy y transporte en staging antes de publicar.
 
 ### Auditoría de dependencias TASK-07
 

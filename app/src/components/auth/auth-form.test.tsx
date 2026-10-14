@@ -38,6 +38,7 @@ describe("AuthForm", () => {
     await waitFor(() => expect(mocks.register).toHaveBeenCalledWith({ name: "Juan Pérez", email: "juan@example.com", password: "correct horse battery" }));
     expect(mocks.login).toHaveBeenCalledWith({ email: "juan@example.com", password: "correct horse battery" });
     expect(mocks.replace).toHaveBeenCalledWith("/verify-email?registered=1");
+    expect(sessionStorage.getItem("nuari_verify_email")).toBe("juan@example.com");
   });
 
   it("passes a safe invitation return path through registration, login, and verification", async () => {

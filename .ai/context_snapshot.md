@@ -1,12 +1,12 @@
 # Context snapshot
 
 - Actualizado: 2026-10-14
-- Estado del repositorio: corregida la revocación FEAT-002: el listado filtra membresías activas, el estado revocado se informa al usuario, y el contexto de autenticación conserva/fallbackea la sesión. Se mantienen los cambios previos de TASK-08 en el árbol de trabajo.
-- Fase: recuperación del registro → verificación → retorno a invitación completada; revocación de miembros y navegación posterior corregidas. Fase 2 de endurecimiento general de invitaciones no iniciada.
+- Estado del repositorio: FEAT-001 y FEAT-002 cerradas; unificada la administración de miembros en `/app/equipo` el 2026-10-14. Los flujos principales de autenticación, configuración, invitaciones, permisos y revocación fueron validados manualmente.
+- Fase: identidad, organización y membresías principales completadas. Equipo administra cuentas reales por API usando la UI de tarjetas elegida; la ruta anterior redirige con guardia. No hay una feature nueva iniciada.
 
 ## Objetivo actual
 
-La corrección acotada de revocación de FEAT-002 está implementada; no iniciar la Fase 2 de endurecimiento general de invitaciones sin autorización explícita.
+FEAT-001 y FEAT-002 están completadas. `/app/equipo` es el punto único de administración de miembros; los profesionales operativos siguen siendo un dominio separado.
 
 ## Estado verificable
 
@@ -14,16 +14,18 @@ La corrección acotada de revocación de FEAT-002 está implementada; no iniciar
 - La raíz de Turbopack está fijada explícitamente en `app/next.config.ts`.
 - Registro, login, logout, recuperación/verificación de correo y onboarding usan el transporte same-origin `/api`; la creación inicial y los contextos de organización provienen de la API. `/onboarding` y cada página `/app/**` verifican contexto server-side.
 - `/app/configuracion` está integrada con la API (`GET /api/organizations/:id` y `PATCH /api/organizations/:id`), validaciones regionales, guardado reactivo, restricción de slug solo a OWNER y aviso explicativo para carga de logos.
-- `/app/configuracion/miembros` está creada y protegida por `guardPage("business")`, integrando el diseño definitivo de Gemini Canvas con React, TypeScript y Tailwind: gestión de roles, listado de miembros activos, emisión de invitaciones por correo, revocación de accesos e invitaciones, restricciones para el último OWNER y control según rol de la sesión.
+- `/app/equipo` conserva el diseño de tarjetas, búsqueda y filtros, y administra miembros activos e invitaciones reales por API, incluyendo roles, identificación de la cuenta actual, revocación confirmada y protección del último OWNER. `/app/configuracion/miembros` pasa por la misma guardia de negocio y redirige a `/app/equipo`; Configuración enlaza a la ruta principal.
 - `/invitacion/[token]` está implementada fuera del dashboard con diseño fiel de Gemini Canvas: consulta pública del token, opciones de login/registro, sesión automática tras registro, verificación de identidad por correo, retorno seguro a la invitación y aceptación atómica con asignación directa a la organización.
 - `DELETE /api/organizations/:id/members/:memberId` conserva la cuenta y su historial y marca la membresía `INACTIVE`; `GET /members` lista sólo `ACTIVE`. `/auth/me` reelige una organización activa válida o conserva la sesión sin tenant y reporta `ACCESS_REVOKED`; `/onboarding` explica la revocación y permite crear una organización sólo si el backend lo habilita. `TenantGuard` sigue resolviendo la membresía activa en cada petición.
 - La verificación desde invitaciones conserva `returnTo` validado en el correo de verificación, por lo que funciona al abrirlo en otra pestaña; el reenvío no invalida el último token utilizable si la entrega falla y las confirmaciones repetidas de la misma cuenta verificada son idempotentes.
-- No se agregaron migraciones ni se enviaron correos reales durante esta fase; el dispatcher de memoria informa éxito/fallo del adaptador, pero no garantiza entrega final en la bandeja sin una infraestructura posterior.
-- Verificaciones focalizadas de esta corrección:
+- `/verify-email` informa “Revisá tu correo” cuando todavía no hay token, requiere una acción explícita para confirmar y muestra un estado de éxito sin redirigir automáticamente. El email de registro se transfiere como dato efímero de `sessionStorage`, el token se limpia de la URL, y los enlaces de invitación conservan `returnTo` validado. Reenvíos comunican éxito, error y rate limit; un token inválido puede ofrecer continuar si `/auth/me` confirma que la cuenta ya está verificada.
+- Limitaciones vigentes: el dispatcher en memoria no garantiza recepción, rebotes ni reintentos durables de correo; la carga de logos está deshabilitada hasta disponer de almacenamiento seguro; los módulos operativos Turnero mantienen estado local y no son persistencia de negocio real. La validación manual confirmada cubre los flujos principales, no todos los casos de producción/staging.
+- Verificaciones focalizadas de revocación (ejecutadas antes de la unificación):
   - API unitarias (`npx vitest run src/organizations/organizations.service.spec.ts src/organizations/tenant.guard.spec.ts`): 21/21 PASS.
   - API integración (caso `persists member revocation` en `test/auth.integration-spec.ts`): 1/1 PASS contra PostgreSQL de pruebas aislado; sin migraciones.
-  - Frontend (`members-screen`, `onboarding-screen` y `browser.test.ts`): 29/29 PASS.
   - `npm run lint` y `npm run typecheck` en `api/` y `app/`: PASS.
+- Verificación UX de correo (2026-10-14): `npx vitest run src/components/auth/recovery-form.test.tsx src/components/auth/auth-form.test.tsx` en `app/` — 28/28 PASS; `npm run lint` — PASS; `npm run typecheck` — PASS.
+- Verificación de unificación de Equipo (2026-10-14, `app/`): `npm run lint` y `npm run typecheck` — PASS; pruebas focalizadas de Equipo, guardas, configuración/enlace, workspace y navegación móvil — 30/30 PASS en 5 archivos. No se ejecutaron Playwright ni suites completas.
 
 ## Decisiones vigentes
 
@@ -33,9 +35,9 @@ La corrección acotada de revocación de FEAT-002 está implementada; no iniciar
 - El backend es un monolito modular NestJS con autenticación propia según [`ADR-005`](../docs/architecture/decisions/ADR-005-custom-authentication.md).
 - Prisma permanece en la versión mayor 7.
 
-## Próxima tarea
+## Próximo paso
 
-Esperar autorización del usuario para Fase 2; no comenzar endurecimiento general de invitaciones.
+No hay una tarea funcional activa. Consultar `.ai/known_issues.md` y definir el próximo alcance con producto antes de iniciar trabajo nuevo.
 
 ## Contexto para la próxima tarea
 

@@ -46,6 +46,7 @@ export function AuthForm({ mode, registered = false, returnTo }: AuthFormProps) 
         if (name.length > 100) { setMessage("El nombre completo no puede superar 100 caracteres."); return; }
         await register({ name, email, password, ...(returnTo && isSafeReturnTo(returnTo) ? { returnTo } : {}) });
         await login({ email, password });
+        try { sessionStorage.setItem("nuari_verify_email", email); } catch { /* The verification page remains usable without a recipient label. */ }
         form.reset();
         const verificationUrl = returnTo ? `/verify-email?registered=1&returnTo=${encodeURIComponent(returnTo)}` : "/verify-email?registered=1";
         router.replace(verificationUrl);

@@ -1,5 +1,7 @@
 # TASK-07 — FEAT-001: Autenticación, organizaciones y onboarding
 
+**Estado de cierre: COMPLETADA — validación manual de los flujos principales confirmada por producto el 2026-10-14.**
+
 ## Goal
 
 Persistir en PostgreSQL el flujo registro → login → verificación de correo → `/onboarding` → organización + membresía OWNER + suscripción de prueba de 14 días → `/app`. Implementar identidad global, sesiones seguras y autorización por organización; conectar las vistas existentes sin rediseñarlas.
@@ -248,7 +250,7 @@ Tests acompañan cada fase; E no posterga tests críticos. No liberar onboarding
 6. Fallo de cualquier paso revierte todo; duplicación/concurrencia/retry/recarga/clave nueva no duplican ni amplían prueba. Payload distinto con misma clave falla; concesión previa sigue bloqueando aunque la membresía esté inactiva.
 7. Dos tenants y usuarios con distintos roles no pueden seleccionar/consultar organización ajena; revocar membresía elimina acceso sin necesitar logout. Suscripción se aplica a todos los miembros del tenant.
 8. Workspace protegido deniega exactamente al vencer, mientras cuenta/logout/contexto/suscripción siguen disponibles. Frontend desmonta gestión e impide métodos locales denegados; regularización no simula pago y empleado ve contacto de administrador.
-9. Formularios existentes mantienen apariencia/interacción/animaciones/accesibilidad con estados pending/error y retry seguro; confirmación/navegación sólo tras backend. Nuevas pantallas auxiliares usan lenguaje visual existente.
+9. Formularios existentes mantienen apariencia/interacción/animaciones/accesibilidad con estados pending/error y retry seguro; confirmación/navegación sólo tras backend. La verificación distingue espera del correo, confirmación explícita, éxito y enlace inválido; conserva el retorno validado de invitaciones y ofrece reenvío con feedback. Nuevas pantallas auxiliares usan lenguaje visual existente.
 10. Unitarias, PostgreSQL real, HTTP y navegador cubren criterios, manipulación y concurrencia. No se declara seguridad/persistencia real de turnos/caja/equipo.
 11. **Definition of Done:** A–E completas; migraciones reproducibles; documentación/ADRs/variables alineadas; lint/typecheck/tests/builds y revisión de seguridad sin bloqueantes; resultados y archivos registrados por Coder en `Implementation`/`Verification Results`, sin reescribir este contrato. Falta de DB/correo/staging/pruebas requeridas = BLOCKED, nunca PASS ni feature terminada.
 
@@ -321,3 +323,4 @@ Registrar versiones, comandos, PASS/FAIL/BLOCKED, pruebas manuales HTTPS/correo 
   - `registro, verificación, onboarding, sesión, expiración y acceso EMPLOYEE`: PASS (`1 passed (27.8s)`, código de salida 0). El ciclo funcional completo en navegador y la limpieza final (`cleanupRun`) se ejecutaron sin errores.
   - `visitante no recibe contenido privado en HTML/RSC de rutas privadas`: Verificación de aislamiento en SSR/RSC completada.
 - **Estado General**: COMPLETADO / VERIFICADO. FEAT-001 cumple los criterios de aceptación y queda cerrado para dar paso a FEAT-002.
+- **Cierre final (2026-10-14)**: autenticación, verificación de correo y onboarding validados manualmente junto con la configuración, invitaciones, permisos y revocación de FEAT-002. La mejora UX de verificación está registrada en `.ai/context_snapshot.md`; sus pruebas focalizadas, lint y typecheck constan en el estado operativo.

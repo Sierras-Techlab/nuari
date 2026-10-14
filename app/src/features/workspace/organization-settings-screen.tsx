@@ -418,11 +418,11 @@ export function OrganizationSettingsScreen() {
           </p>
         </div>
         <Link
-          href="/app/configuracion/miembros"
+          href="/app/equipo"
           className="inline-flex items-center gap-2 rounded-xl border border-[#E4E9E7] bg-white px-4 py-2.5 text-sm font-bold text-[#182026] shadow-xs transition-colors hover:bg-[#F8FAF9] hover:border-[#182026]/30"
         >
           <UsersThree size={18} className="text-[#182026]" />
-          <span>Miembros y accesos</span>
+          <span>Equipo y accesos</span>
         </Link>
       </header>
 

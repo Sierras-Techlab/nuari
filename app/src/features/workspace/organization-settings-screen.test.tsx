@@ -81,6 +81,7 @@ describe("OrganizationSettingsScreen", () => {
     expect(screen.getByText("Preferencias")).toBeTruthy();
     expect(screen.getByText("Enlace público")).toBeTruthy();
     expect(screen.getByDisplayValue("Estudio Nuari")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Equipo y accesos" }).getAttribute("href")).toBe("/app/equipo");
   });
 
   it("shows floating action bar on unsaved changes and allows discarding", () => {

@@ -14,7 +14,6 @@ import { DemoAppointmentProvider } from "@/features/appointments/demo-provider";
 import { CashScreen } from "./cash-screen";
 import { ClientsScreen } from "./clients-screen";
 import { ServicesScreen } from "./services-screen";
-import { TeamScreen } from "./team-screen";
 import { WorkspaceProvider } from "./workspace-provider";
 
 describe("workspace sections", () => {
@@ -64,18 +63,7 @@ describe("workspace sections", () => {
     expect(screen.queryByText("Ingreso manual")).toBeNull();
   });
 
-  it("adds a professional to the team directory", async () => {
-    render(<WorkspaceProvider><TeamScreen /></WorkspaceProvider>);
-    await screen.findByText("Martín Ríos");
-    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Ana Torres" } });
-    fireEvent.change(screen.getByLabelText("Correo"), { target: { value: "ana@negocio.test" } });
-    fireEvent.click(screen.getByRole("button", { name: "Agregar integrante" }));
-    await waitFor(() => expect(screen.getByText("Ana Torres")).toBeTruthy());
-    fireEvent.change(screen.getByLabelText("Filtrar por función"), { target: { value: "admin" } });
-    expect(screen.queryByText("Ana Torres")).toBeNull();
-  });
-
-  it("offers newly added services and professionals when creating a turn", async () => {
+  it("offers services and operational professionals when creating a turn", async () => {
     const tree = (child: React.ReactNode) => <WorkspaceProvider><DemoAppointmentProvider>{child}</DemoAppointmentProvider></WorkspaceProvider>;
     const view = render(tree(<ServicesScreen />));
     await screen.findByText("Servicio estándar");
@@ -83,16 +71,9 @@ describe("workspace sections", () => {
     fireEvent.click(screen.getByRole("button", { name: "Agregar servicio" }));
     await screen.findByText("Evaluación");
 
-    view.rerender(tree(<TeamScreen />));
-    await screen.findByText("Martín Ríos");
-    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Ana Torres" } });
-    fireEvent.change(screen.getByLabelText("Correo"), { target: { value: "ana@negocio.test" } });
-    fireEvent.click(screen.getByRole("button", { name: "Agregar integrante" }));
-    await screen.findByText("Ana Torres");
-
     view.rerender(tree(<AgendaScreen />));
     fireEvent.click(await screen.findByRole("button", { name: "Nuevo turno" }));
     expect(screen.getByRole("option", { name: /Evaluación/ })).toBeTruthy();
-    expect(screen.getAllByRole("option", { name: "Ana Torres" })).toHaveLength(2);
+    expect(screen.getAllByRole("option", { name: "Martín Ríos" })).toHaveLength(2);
   });
 });
