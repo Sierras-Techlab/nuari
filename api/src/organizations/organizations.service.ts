@@ -9,6 +9,7 @@ import type { SessionPrincipal } from '../common/request.js';
 import { IdentityService, userDto } from '../identity/identity.service.js';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service.js';
 import { EmailDispatcher } from '../integrations/email-dispatcher.js';
+import { SchedulingReadService } from '../availability/scheduling-read.service.js';
 import { CreateOrganizationDto, CreateInvitationDto, REGIONAL_CONFIG, type SupportedCountry, UpdateMemberRoleDto, UpdateOrganizationDto } from './organizations.dto.js';
 
 
@@ -87,6 +88,7 @@ export class OrganizationsService {
     private readonly subscriptions: SubscriptionsService,
     private readonly clock: Clock,
     private readonly emails: EmailDispatcher,
+    private readonly schedulingRead: SchedulingReadService,
   ) {}
   listActive(userId: string, tx: TransactionContext = this.db) {
 
@@ -156,6 +158,8 @@ export class OrganizationsService {
           if (!user.emailVerifiedAt) throw new ApiError(403, 'EMAIL_UNVERIFIED', 'Verificá tu correo para iniciar la prueba.');
           const now = this.clock.now();
           const organization = await tx.organization.create({ data: { name: input.name, slug: input.slug, businessType: input.businessType, createdAt: now, updatedAt: now } });
+          await tx.schedulingSettings.create({ data: { organizationId: organization.id } });
+          await tx.bookingCalendar.create({ data: { organizationId: organization.id, kind: 'BUSINESS' } });
           const member = await tx.organizationMember.create({ data: { userId: user.id, organizationId: organization.id, role: 'OWNER', status: 'ACTIVE', createdAt: now, updatedAt: now } });
           await this.subscriptions.createTrial(tx, user.id, organization.id, input.planCode, now);
           await tx.onboardingSubmission.create({ data: { userId: user.id, key, requestHash, organizationId: organization.id, createdAt: now } });
@@ -251,6 +255,17 @@ export class OrganizationsService {
           });
         }
 
+        const effectiveTimezone = input.timezone ?? (
+          input.country !== undefined && !regional.timezones.includes(current.timezone as never)
+            ? regional.timezones[0]
+            : current.timezone
+        );
+        if (effectiveTimezone !== current.timezone) {
+          await this.schedulingRead.assertTimeZoneChangeAllowed(
+            { organizationId: member.organizationId }, tx, now,
+          );
+        }
+
         const effectiveCurrency = input.currency ?? (input.country !== undefined ? regional.currency : current.currency);
         const currencyChanged = effectiveCurrency !== current.currency;
         if (currencyChanged) {
@@ -275,7 +290,7 @@ export class OrganizationsService {
             dataToUpdate.timezone = regional.timezones[0];
           }
         }
-        if (input.timezone !== undefined) dataToUpdate.timezone = input.timezone;
+        if (effectiveTimezone !== current.timezone) dataToUpdate.timezone = effectiveTimezone;
 
         const updated = await tx.organization.update({
           where: { id: member.organizationId },
@@ -293,7 +308,7 @@ export class OrganizationsService {
         if (input.slug !== undefined && input.slug !== current.slug) sensitiveChanges.push(`slug:${input.slug}`);
         if (input.name !== undefined && input.name !== current.name) sensitiveChanges.push(`name:${input.name}`);
         if (input.country !== undefined && input.country !== current.country) sensitiveChanges.push(`country:${input.country}`);
-        if (input.timezone !== undefined && input.timezone !== current.timezone) sensitiveChanges.push(`timezone:${input.timezone}`);
+        if (effectiveTimezone !== current.timezone) sensitiveChanges.push(`timezone:${effectiveTimezone}`);
         if (currencyChanged) sensitiveChanges.push(`currency:${effectiveCurrency}`);
 
         await tx.organizationAuditLog.create({

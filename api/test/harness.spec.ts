@@ -15,6 +15,13 @@ describe('database test safety boundary', () => {
     expect(() => isolatedDatabaseEnvironment({ TEST_DATABASE_URL: pooled, TEST_DIRECT_URL: direct })).toThrow('loopback-only');
     expect(() => isolatedDatabaseEnvironment({ TEST_DATABASE_URL: pooled, TEST_DIRECT_URL: direct, TEST_DATABASE_SHARED_DEV_ENDPOINT: 'ep-other-999' })).toThrow('loopback-only');
   });
+  it('accepts an exact isolated Neon endpoint only with the dedicated opt-in', () => {
+    const pooled = 'postgresql://u:p@ep-feat10-pooler.c-2.sa-east-1.aws.neon.tech/neondb?sslmode=require';
+    const direct = 'postgresql://u:p@ep-feat10.c-2.sa-east-1.aws.neon.tech/neondb?sslmode=require';
+    expect(isolatedDatabaseEnvironment({ TEST_DATABASE_URL: pooled, TEST_DIRECT_URL: direct, TEST_DATABASE_ISOLATED_NEON_ENDPOINT: 'ep-feat10' })).toEqual({ databaseUrl: pooled, directUrl: direct });
+    expect(() => isolatedDatabaseEnvironment({ TEST_DATABASE_URL: pooled, TEST_DIRECT_URL: direct })).toThrow('loopback-only');
+    expect(() => isolatedDatabaseEnvironment({ TEST_DATABASE_URL: pooled, TEST_DIRECT_URL: direct, TEST_DATABASE_ISOLATED_NEON_ENDPOINT: 'ep-other' })).toThrow('loopback-only');
+  });
   it('rejects a non-Neon host and mismatched pooled/direct endpoints even with opt-in', () => {
     const remote = 'postgresql://u:p@ep-abc-123.evil.example/neondb';
     expect(() => isolatedDatabaseEnvironment({ TEST_DATABASE_URL: remote, TEST_DIRECT_URL: remote, TEST_DATABASE_SHARED_DEV_ENDPOINT: 'ep-abc-123' })).toThrow('loopback-only');

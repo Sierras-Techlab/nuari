@@ -19,6 +19,10 @@ Una identidad global puede tener membresías activas en varias organizaciones y 
 
 Un `organizationId` enviado por ruta, cabecera o body sólo selecciona una organización candidata. Nunca prueba que el usuario pueda acceder a ella.
 
+### Capacidad pública de reserva — aprobada, sin implementar
+
+[ADR-009](decisions/ADR-009-scheduling-core-decisions.md) aprueba reserva pública sin cuenta, nombre/contacto obligatorios y gestión por enlace seguro. Ese visitante no recibe TenantContext de miembro: la API resolverá una capacidad explícita de publicación/gestión acotada a una organización y, en la gestión, a una sola reserva. No crear User ni membresía ficticios ni confiar en IDs del body para establecer scope. Conservar filtros, FK y restricciones tenant-aware; ninguna consulta pública devuelve directorio de clientes, contactos privados del personal ni agenda interna. Parámetros de publicación/token y excepción con suscripción vencida siguen pendientes en TASK-10; no son permisos privados implícitos. Las reglas de membresía anteriores siguen vigentes para todas las operaciones privadas.
+
 ## Persistencia
 
 - Toda tabla operativa incluye `organizationId` no nulo cuando el concepto pertenece a un tenant.

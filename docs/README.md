@@ -24,7 +24,9 @@ Este directorio contiene la fuente de verdad legible para producto, arquitectura
 - [`architecture/decisions/ADR-004-living-documentation.md`](architecture/decisions/ADR-004-living-documentation.md)
 - [`architecture/decisions/ADR-005-custom-authentication.md`](architecture/decisions/ADR-005-custom-authentication.md)
 - [`architecture/decisions/ADR-006-same-origin-web-api-transport.md`](architecture/decisions/ADR-006-same-origin-web-api-transport.md)
-- [`architecture/decisions/ADR-007-operational-core.md`](architecture/decisions/ADR-007-operational-core.md): decisiones operativas aprobadas y estado de implementación de B1–B3.
+- [`architecture/decisions/ADR-007-operational-core.md`](architecture/decisions/ADR-007-operational-core.md): decisiones operativas aprobadas y estado de implementación de FEAT-003 B1–B10.
+- [`architecture/decisions/ADR-008-scheduling-personalization.md`](architecture/decisions/ADR-008-scheduling-personalization.md): personalización del turnero por organización aprobada; no aprueba el resto de FEAT-004 ni autoriza implementación.
+- [`architecture/decisions/ADR-009-scheduling-core-decisions.md`](architecture/decisions/ADR-009-scheduling-core-decisions.md): seis decisiones aprobadas de capacidad, estados, asignación, empleados, público y tiempo/integridad; sin autorización de iniciar B1.
 
 ## Desarrollo
 
@@ -35,7 +37,8 @@ Este directorio contiene la fuente de verdad legible para producto, arquitectura
 ## Planes de implementación
 
 - [`tasks/`](tasks/): contratos de implementación y revisión entre agentes.
-- [`TASK-09 — FEAT-003`](tasks/TASK-09-feat-003-operational-catalog.md): contrato y estado de los bloques del núcleo operativo; B1–B3 completados y B4–B10 no autorizados.
+- [`TASK-09 — FEAT-003`](tasks/TASK-09-feat-003-operational-catalog.md): contrato y cierre del núcleo operativo; B1–B10 completados.
+- [`TASK-10 — FEAT-004`](tasks/TASK-10-feat-004-scheduling-availability-appointments.md): personalización y seis principios aprobados; once propuestas de cierre de dominio pendientes de aprobación final, sin iniciar B1.
 
 - [`superpowers/plans/2026-08-31-npm-root-layout.md`](superpowers/plans/2026-08-31-npm-root-layout.md): migración vigente a `app/` y `api/` como proyectos npm independientes.
 - [`superpowers/plans/2026-08-27-project-initialization.md`](superpowers/plans/2026-08-27-project-initialization.md): plan histórico de la inicialización original, reemplazado en su estructura de paquetes.

@@ -1,4 +1,6 @@
-# TASK-08 — FEAT-002: Persistencia y lógica de negocio del Turnero (Flujo Piloto)
+# Borrador histórico sustituido — Persistencia del Turnero
+
+**No ejecutar este borrador.** Su denominación anterior TASK-08/FEAT-002 colisionaba con la tarea vigente de organizaciones y miembros. El catálogo persistente se completó en [TASK-09 — FEAT-003](TASK-09-feat-003-operational-catalog.md); la propuesta vigente de agenda y disponibilidad está en [TASK-10 — FEAT-004](TASK-10-feat-004-scheduling-availability-appointments.md), pendiente de aprobación. El contenido siguiente conserva el antecedente, no contratos actuales ni autorización de migrar o implementar Caja.
 
 ## Goal
 

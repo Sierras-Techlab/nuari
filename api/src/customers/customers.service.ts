@@ -4,9 +4,11 @@ import { Clock } from '../common/clock.js';
 import { ApiError } from '../common/errors.js';
 import { parseIfMatch } from '../common/if-match.js';
 import { PrismaService } from '../database/prisma.service.js';
+import type { TransactionContext } from '../common/transaction.js';
 import type { OperationalAuditAction, OperationalAuditField } from '../organizations/organizations.service.js';
 import { OrganizationsService } from '../organizations/organizations.service.js';
 import type { TenantContext } from '../organizations/tenant.guard.js';
+import type { BookingScope } from '../availability/scheduling-read.service.js';
 import { CustomerStatusFilter, type CreateCustomerDto, type CustomerListQueryDto, type DuplicateCustomerCandidatesQueryDto, type UpdateCustomerDto } from './customers.dto.js';
 import { customerDetailDto, customerSummaryDto } from './customers.mapper.js';
 
@@ -71,6 +73,15 @@ export class CustomersService {
     private readonly organizations: OrganizationsService,
     private readonly clock: Clock,
   ) {}
+
+  async getBookableCustomer(scope: BookingScope, customerId: string, tx: TransactionContext = this.db) {
+    const customer = await tx.customer.findFirst({
+      where: { id: customerId, organizationId: scope.organizationId, active: true },
+      select: { id: true, organizationId: true, name: true, phone: true, email: true, active: true },
+    });
+    if (!customer) throw notFound();
+    return customer;
+  }
 
   async list(context: TenantContext, query: CustomerListQueryDto) {
     const search = query.q === undefined ? undefined : escapeLikePattern(query.q);

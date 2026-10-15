@@ -55,13 +55,36 @@ enum ServiceModality {
   IN_PERSON
 }
 
+enum AppointmentStatus {
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum BookingAssignmentKind {
+  SPECIFIC
+  ANY
+  NONE
+}
+
+enum BookingActorType {
+  MEMBER
+  PUBLIC
+}
+
+enum BookingCalendarKind {
+  BUSINESS
+  STAFF
+}
+
 model User {
-  id                      String @id @default(uuid()) @db.Uuid
+  id                      String                   @id @default(uuid()) @db.Uuid
   name                    String
-  email                   String @unique
-  emailVerifiedAt         DateTime? @db.Timestamptz(3)
-  createdAt               DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt               DateTime @updatedAt @db.Timestamptz(3)
+  email                   String                   @unique
+  emailVerifiedAt         DateTime?                @db.Timestamptz(3)
+  createdAt               DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime                 @updatedAt @db.Timestamptz(3)
   credential              UserCredential?
   sessions                Session[]
   emailVerificationTokens EmailVerificationToken[]
@@ -75,143 +98,162 @@ model User {
 }
 
 model UserCredential {
-  userId            String @id @db.Uuid
+  userId            String   @id @db.Uuid
   passwordHash      String
-  version           Int @default(1)
+  version           Int      @default(1)
   passwordChangedAt DateTime @db.Timestamptz(3)
   updatedAt         DateTime @updatedAt @db.Timestamptz(3)
-  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Session {
-  id                   String @id @default(uuid()) @db.Uuid
-  userId               String @db.Uuid
-  tokenHash            String @unique @db.Char(64)
+  id                   String        @id @default(uuid()) @db.Uuid
+  userId               String        @db.Uuid
+  tokenHash            String        @unique @db.Char(64)
   credentialVersion    Int
-  activeOrganizationId String? @db.Uuid
-  createdAt            DateTime @db.Timestamptz(3)
-  lastSeenAt           DateTime @db.Timestamptz(3)
-  expiresAt            DateTime @db.Timestamptz(3)
-  revokedAt            DateTime? @db.Timestamptz(3)
-  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeOrganizationId String?       @db.Uuid
+  createdAt            DateTime      @db.Timestamptz(3)
+  lastSeenAt           DateTime      @db.Timestamptz(3)
+  expiresAt            DateTime      @db.Timestamptz(3)
+  revokedAt            DateTime?     @db.Timestamptz(3)
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   activeOrganization   Organization? @relation(fields: [activeOrganizationId], references: [id], onDelete: SetNull)
+
   @@index([userId, revokedAt])
   @@index([expiresAt])
 }
 
 model EmailVerificationToken {
-  id         String @id @default(uuid()) @db.Uuid
-  userId     String @db.Uuid
-  tokenHash  String @unique @db.Char(64)
-  createdAt  DateTime @db.Timestamptz(3)
-  expiresAt  DateTime @db.Timestamptz(3)
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique @db.Char(64)
+  createdAt  DateTime  @db.Timestamptz(3)
+  expiresAt  DateTime  @db.Timestamptz(3)
   consumedAt DateTime? @db.Timestamptz(3)
-  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, consumedAt])
   @@index([expiresAt])
 }
 
 model PasswordResetToken {
-  id         String @id @default(uuid()) @db.Uuid
-  userId     String @db.Uuid
-  tokenHash  String @unique @db.Char(64)
-  createdAt  DateTime @db.Timestamptz(3)
-  expiresAt  DateTime @db.Timestamptz(3)
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique @db.Char(64)
+  createdAt  DateTime  @db.Timestamptz(3)
+  expiresAt  DateTime  @db.Timestamptz(3)
   consumedAt DateTime? @db.Timestamptz(3)
-  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, consumedAt])
   @@index([expiresAt])
 }
 
 model RateLimitBucket {
   scope           String
-  keyHash         String @db.Char(64)
+  keyHash         String   @db.Char(64)
   windowStartedAt DateTime @db.Timestamptz(3)
   count           Int
   expiresAt       DateTime @db.Timestamptz(3)
+
   @@id([scope, keyHash, windowStartedAt])
   @@index([expiresAt])
 }
 
 model Organization {
-  id                    String @id @default(uuid()) @db.Uuid
-  name                  String
-  slug                  String @unique
-  businessType          BusinessType
-  description           String?
-  email                 String?
-  phone                 String?
-  website               String?
-  country               String?
-  state                 String?
-  city                  String?
-  zip                   String?
-  address               String?
-  timezone              String @default("America/Argentina/Buenos_Aires")
-  currency              String @default("ARS")
-  logoUrl               String?
-  createdAt             DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
-  memberships           OrganizationMember[]
-  selectedBySessions    Session[]
-  subscription          Subscription?
-  trialGrant            TrialGrant?
-  onboardingSubmission  OnboardingSubmission?
-  invitations           OrganizationInvitation[]
-  auditLogs             OrganizationAuditLog[]
-  customers             Customer[]
-  serviceCategories     ServiceCategory[]
-  services              Service[]
-  staffMembers           StaffMember[]
+  id                      String                   @id @default(uuid()) @db.Uuid
+  name                    String
+  slug                    String                   @unique
+  businessType            BusinessType
+  description             String?
+  email                   String?
+  phone                   String?
+  website                 String?
+  country                 String?
+  state                   String?
+  city                    String?
+  zip                     String?
+  address                 String?
+  timezone                String                   @default("America/Argentina/Buenos_Aires")
+  currency                String                   @default("ARS")
+  logoUrl                 String?
+  createdAt               DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime                 @updatedAt @db.Timestamptz(3)
+  memberships             OrganizationMember[]
+  selectedBySessions      Session[]
+  subscription            Subscription?
+  trialGrant              TrialGrant?
+  onboardingSubmission    OnboardingSubmission?
+  invitations             OrganizationInvitation[]
+  auditLogs               OrganizationAuditLog[]
+  customers               Customer[]
+  serviceCategories       ServiceCategory[]
+  services                Service[]
+  staffMembers            StaffMember[]
+  bookingCalendars        BookingCalendar[]
+  schedulingSettings      SchedulingSettings?
+  appointments            Appointment[]
+  appointmentEvents       AppointmentEvent[]
+  bookingSubmissions      BookingSubmission[]
+  calendarWeeklyWindows   CalendarWeeklyWindow[]
+  calendarDayOverrides    CalendarDayOverride[]
+  calendarOverrideWindows CalendarOverrideWindow[]
+  calendarTimeOff         CalendarTimeOff[]
 }
 
 model OrganizationMember {
-  id             String @id @default(uuid()) @db.Uuid
-  userId         String @db.Uuid
-  organizationId String @db.Uuid
-  role           OrganizationRole
-  status         MembershipStatus
-  createdAt      DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
-  user           User @relation(fields: [userId], references: [id], onDelete: Restrict)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id                  String             @id @default(uuid()) @db.Uuid
+  userId              String             @db.Uuid
+  organizationId      String             @db.Uuid
+  role                OrganizationRole
+  status              MembershipStatus
+  createdAt           DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime           @updatedAt @db.Timestamptz(3)
+  user                User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organization        Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdAppointments Appointment[]      @relation("AppointmentCreatedBy")
+  appointmentEvents   AppointmentEvent[]
+
   @@unique([userId, organizationId])
+  @@unique([organizationId, id])
   @@index([userId, status])
   @@index([organizationId, status])
 }
 
 model Subscription {
-  id             String @id @default(uuid()) @db.Uuid
-  organizationId String @unique @db.Uuid
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @unique @db.Uuid
   planCode       PlanCode
   status         SubscriptionStatus
-  trialStartedAt DateTime @db.Timestamptz(3)
-  trialEndsAt    DateTime @db.Timestamptz(3)
-  paidThrough    DateTime? @db.Timestamptz(3)
-  createdAt      DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  trialStartedAt DateTime           @db.Timestamptz(3)
+  trialEndsAt    DateTime           @db.Timestamptz(3)
+  paidThrough    DateTime?          @db.Timestamptz(3)
+  createdAt      DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime           @updatedAt @db.Timestamptz(3)
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
   @@index([status, trialEndsAt])
 }
 
 model TrialGrant {
-  id             String @id @default(uuid()) @db.Uuid
-  userId         String @unique @db.Uuid
-  organizationId String @unique @db.Uuid
-  grantedAt      DateTime @db.Timestamptz(3)
-  user           User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @unique @db.Uuid
+  organizationId String       @unique @db.Uuid
+  grantedAt      DateTime     @db.Timestamptz(3)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 }
 
 model OnboardingSubmission {
-  id             String @id @default(uuid()) @db.Uuid
-  userId         String @db.Uuid
-  key            String @db.Uuid
-  requestHash    String @db.Char(64)
-  organizationId String @unique @db.Uuid
-  createdAt      DateTime @db.Timestamptz(3)
-  user           User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @db.Uuid
+  key            String       @db.Uuid
+  requestHash    String       @db.Char(64)
+  organizationId String       @unique @db.Uuid
+  createdAt      DateTime     @db.Timestamptz(3)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
   @@unique([userId, key])
 }
 
@@ -228,6 +270,7 @@ model OrganizationInvitation {
   revokedAt       DateTime?        @db.Timestamptz(3)
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   invitedByUser   User             @relation("InvitedByUser", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+
   @@index([organizationId, email])
   @@index([expiresAt])
 }
@@ -242,22 +285,24 @@ model OrganizationAuditLog {
   createdAt      DateTime     @default(now()) @db.Timestamptz(3)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   actorUser      User         @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
   @@index([organizationId, createdAt])
 }
 
 model Customer {
-  id              String       @id @default(uuid()) @db.Uuid
-  organizationId  String       @db.Uuid
-  name            String       @db.VarChar(150)
-  phone           String?      @db.VarChar(30)
-  phoneNormalized String?      @db.VarChar(30)
-  email           String?      @db.VarChar(254)
-  notes           String?      @db.VarChar(4000)
-  active          Boolean      @default(true)
-  version         Int          @default(1)
-  createdAt       DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt       DateTime     @updatedAt @db.Timestamptz(3)
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  id              String        @id @default(uuid()) @db.Uuid
+  organizationId  String        @db.Uuid
+  name            String        @db.VarChar(150)
+  phone           String?       @db.VarChar(30)
+  phoneNormalized String?       @db.VarChar(30)
+  email           String?       @db.VarChar(254)
+  notes           String?       @db.VarChar(4000)
+  active          Boolean       @default(true)
+  version         Int           @default(1)
+  createdAt       DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @db.Timestamptz(3)
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  appointments    Appointment[]
 
   @@unique([organizationId, id])
   @@index([organizationId, active, createdAt, id])
@@ -304,6 +349,8 @@ model Service {
   organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   category           ServiceCategory?   @relation(fields: [organizationId, categoryId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
   staffLinks         StaffService[]
+  appointments       Appointment[]
+  publicBookable     Boolean            @default(false)
 
   @@unique([organizationId, id])
   @@unique([organizationId, nameKey])
@@ -312,19 +359,21 @@ model Service {
 }
 
 model StaffMember {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @db.Uuid
-  name           String       @db.VarChar(150)
-  email          String?      @db.VarChar(254)
-  phone          String?      @db.VarChar(30)
-  active         Boolean      @default(true)
-  userId         String?      @db.Uuid
-  version        Int          @default(1)
-  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  user           User?        @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  serviceLinks   StaffService[]
+  id               String            @id @default(uuid()) @db.Uuid
+  organizationId   String            @db.Uuid
+  name             String            @db.VarChar(150)
+  email            String?           @db.VarChar(254)
+  phone            String?           @db.VarChar(30)
+  active           Boolean           @default(true)
+  userId           String?           @db.Uuid
+  version          Int               @default(1)
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @db.Timestamptz(3)
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  user             User?             @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  serviceLinks     StaffService[]
+  bookingCalendars BookingCalendar[]
+  appointments     Appointment[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, userId])
@@ -341,4 +390,168 @@ model StaffService {
 
   @@id([organizationId, staffMemberId, serviceId])
   @@index([organizationId, serviceId, staffMemberId])
+}
+
+model Appointment {
+  id                                String                @id @default(uuid()) @db.Uuid
+  organizationId                    String                @db.Uuid
+  customerId                        String                @db.Uuid
+  serviceId                         String                @db.Uuid
+  staffMemberId                     String?               @db.Uuid
+  startAt                           DateTime              @db.Timestamptz(3)
+  endAt                             DateTime              @db.Timestamptz(3)
+  durationMinutes                   Int
+  schedulingPolicyVersion           Int
+  slotStepMinutesSnapshot           Int
+  publicMinNoticeMinutesSnapshot    Int
+  publicMaxAdvanceDaysSnapshot      Int
+  publicCancelNoticeMinutesSnapshot Int
+  timezoneSnapshot                  String                @db.VarChar(100)
+  serviceSelectionModeSnapshot      StaffSelectionMode
+  assignmentKind                    BookingAssignmentKind
+  customerNameSnapshot              String                @db.VarChar(150)
+  customerPhoneSnapshot             String?               @db.VarChar(30)
+  customerEmailSnapshot             String?               @db.VarChar(254)
+  serviceNameSnapshot               String                @db.VarChar(150)
+  staffNameSnapshot                 String?               @db.VarChar(150)
+  status                            AppointmentStatus     @default(CONFIRMED)
+  source                            BookingActorType
+  createdByMembershipId             String?               @db.Uuid
+  internalNotes                     String?               @db.VarChar(4000)
+  managementTokenHash               String?               @unique @db.Char(64)
+  managementTokenKeyVersion         Int?
+  managementTokenVersion            Int                   @default(1)
+  managementTokenExpiresAt          DateTime?             @db.Timestamptz(3)
+  version                           Int                   @default(1)
+  createdAt                         DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt                         DateTime              @updatedAt @db.Timestamptz(3)
+  organization                      Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  customer                          Customer              @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  service                           Service               @relation(fields: [organizationId, serviceId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  staffMember                       StaffMember?          @relation(fields: [organizationId, staffMemberId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  createdByMembership               OrganizationMember?   @relation("AppointmentCreatedBy", fields: [organizationId, createdByMembershipId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  events                            AppointmentEvent[]
+  submissions                       BookingSubmission[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, startAt, id])
+  @@index([organizationId, staffMemberId, startAt])
+  @@index([organizationId, customerId, startAt, id])
+  @@index([organizationId, status, startAt])
+}
+
+model AppointmentEvent {
+  id                String              @id @default(uuid()) @db.Uuid
+  organizationId    String              @db.Uuid
+  appointmentId     String              @db.Uuid
+  actorType         BookingActorType
+  actorMembershipId String?             @db.Uuid
+  action            String              @db.VarChar(30)
+  reasonCode        String?             @db.VarChar(40)
+  before            Json?
+  after             Json
+  createdAt         DateTime            @default(now()) @db.Timestamptz(3)
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  appointment       Appointment         @relation(fields: [organizationId, appointmentId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  actorMembership   OrganizationMember? @relation(fields: [organizationId, actorMembershipId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([organizationId, appointmentId, createdAt, id])
+}
+
+model BookingSubmission {
+  id                    String       @id @default(uuid()) @db.Uuid
+  organizationId        String       @db.Uuid
+  actorScope            String       @db.VarChar(80)
+  keyHash               String       @db.Char(64)
+  requestHash           String       @db.Char(64)
+  requestHashKeyVersion Int          @default(1)
+  appointmentId         String       @db.Uuid
+  createdAt             DateTime     @default(now()) @db.Timestamptz(3)
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  appointment           Appointment  @relation(fields: [organizationId, appointmentId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([organizationId, actorScope, keyHash])
+  @@index([organizationId, appointmentId])
+}
+
+model BookingCalendar {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @db.Uuid
+  kind           BookingCalendarKind
+  staffMemberId  String?                @db.Uuid
+  version        Int                    @default(1)
+  createdAt      DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime               @updatedAt @db.Timestamptz(3)
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  staffMember    StaffMember?           @relation(fields: [organizationId, staffMemberId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  weeklyWindows  CalendarWeeklyWindow[]
+  dayOverrides   CalendarDayOverride[]
+  timeOff        CalendarTimeOff[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, staffMemberId])
+}
+
+model CalendarWeeklyWindow {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @db.Uuid
+  calendarId     String          @db.Uuid
+  weekday        Int
+  startMinute    Int
+  endMinute      Int
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  calendar       BookingCalendar @relation(fields: [organizationId, calendarId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([organizationId, calendarId, weekday, startMinute])
+}
+
+model CalendarDayOverride {
+  id             String                   @id @default(uuid()) @db.Uuid
+  organizationId String                   @db.Uuid
+  calendarId     String                   @db.Uuid
+  localDate      DateTime                 @db.Date
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  calendar       BookingCalendar          @relation(fields: [organizationId, calendarId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  windows        CalendarOverrideWindow[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, calendarId, localDate])
+}
+
+model CalendarOverrideWindow {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @db.Uuid
+  overrideId     String              @db.Uuid
+  startMinute    Int
+  endMinute      Int
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  dayOverride    CalendarDayOverride @relation(fields: [organizationId, overrideId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([organizationId, overrideId, startMinute])
+}
+
+model CalendarTimeOff {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @db.Uuid
+  calendarId     String          @db.Uuid
+  startAt        DateTime        @db.Timestamptz(3)
+  endAt          DateTime        @db.Timestamptz(3)
+  reasonCode     String          @db.VarChar(40)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  calendar       BookingCalendar @relation(fields: [organizationId, calendarId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([organizationId, calendarId, startAt])
+}
+
+model SchedulingSettings {
+  organizationId            String       @id @db.Uuid
+  publicBookingEnabled      Boolean      @default(false)
+  slotStepMinutes           Int          @default(15)
+  publicMinNoticeMinutes    Int          @default(120)
+  publicMaxAdvanceDays      Int          @default(60)
+  publicCancelNoticeMinutes Int          @default(120)
+  version                   Int          @default(1)
+  createdAt                 DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime     @updatedAt @db.Timestamptz(3)
+  organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 }

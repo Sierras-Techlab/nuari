@@ -137,13 +137,62 @@ export type CreateStaffInput = { name: string; email?: string | null; phone?: st
 export type UpdateStaffInput = Partial<CreateStaffInput> & { active?: boolean };
 export type StaffServiceMutationDTO = { association: StaffServiceDTO; serviceVersion: number };
 export type StaffServiceRemoveDTO = { serviceVersion: number };
-export type ApiErrorCode = "VALIDATION_ERROR" | "INVALID_TOKEN" | "INVALID_IDEMPOTENCY_KEY" | "UNAUTHENTICATED" | "INVALID_CREDENTIALS" | "CSRF_INVALID" | "EMAIL_UNVERIFIED" | "TRIAL_ALREADY_USED" | "PERMISSION_DENIED" | "SUBSCRIPTION_REQUIRED" | "ORGANIZATION_NOT_FOUND" | "SLUG_TAKEN" | "ONBOARDING_ALREADY_COMPLETED" | "IDEMPOTENCY_CONFLICT" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "CONTEXT_CHANGED" | "CANNOT_REMOVE_LAST_OWNER" | "MEMBER_NOT_FOUND" | "INVITATION_NOT_FOUND" | "ALREADY_MEMBER" | "EMAIL_MISMATCH" | "INVALID_INVITATION" | "CUSTOMER_NOT_FOUND" | "SERVICE_NOT_FOUND" | "SERVICE_CATEGORY_NOT_FOUND" | "STAFF_MEMBER_NOT_FOUND" | "SERVICE_NAME_TAKEN" | "SERVICE_CATEGORY_NAME_TAKEN" | "RELATED_ENTITY_INACTIVE" | "CURRENCY_CHANGE_REQUIRES_MIGRATION" | "VERSION_CONFLICT";
+export type AppointmentDTO = {
+  id: string; organizationId: string; customerId: string; serviceId: string; staffMemberId: string | null;
+  startAt: string; endAt: string; durationMinutes: number; assignmentKind: "SPECIFIC" | "ANY" | "NONE";
+  status: "CONFIRMED" | "COMPLETED" | "CANCELLED" | "NO_SHOW"; source: "INTERNAL" | "PUBLIC";
+  version: number; customerNameSnapshot: string; serviceNameSnapshot: string; staffNameSnapshot: string | null; timezone: string;
+  internalNotes?: string | null;
+};
+export type AppointmentPageDTO = { items: AppointmentDTO[]; pageInfo: { limit: number; hasMore: boolean; nextCursor: string | null }; timeZone: string };
+export type AppointmentListQuery = { fromDate: string; toDate: string; staffMemberId?: string; status?: AppointmentDTO["status"]; limit?: number; cursor?: string };
+export type AppointmentAssignment = { kind: "SPECIFIC"; staffMemberId: string } | { kind: "ANY" } | { kind: "NONE" };
+export type AppointmentCreateInput = { customerId: string; serviceId: string; startAt: string; assignment: AppointmentAssignment; internalNotes?: string };
+export type AppointmentCancelReason = "CUSTOMER_REQUEST" | "BUSINESS_REQUEST" | "OTHER";
+export type AvailabilityDTO = { slots: Array<{ startAt: string; endAt: string; localDate: string; localTime: string; offset: string; timeZone: string; staff: Array<{ id: string; name: string }> }>; hasMore: boolean; nextCursor: string | null; timeZone: string };
+export type AvailabilityQuery = { serviceId: string; selection: "SPECIFIC" | "ANY" | "NONE"; staffMemberId?: string; fromDate?: string; toDate?: string; at?: string; cursor?: string };
+export type BookingCalendarDTO = {
+  id: string; organizationId: string; kind: "BUSINESS" | "STAFF"; staffMemberId: string | null; version: number;
+  weeklyWindows: Array<{ weekday: number; startMinute: number; endMinute: number }>;
+  dayOverrides: Array<{ localDate: string; windows: Array<{ startMinute: number; endMinute: number }> }>;
+  timeOff: Array<{ id: string; startAt: string; endAt: string; reasonCode: "BUSINESS_CLOSED" | "STAFF_ABSENCE" | "OTHER" }>;
+};
+export type SchedulingSettingsDTO = { slotStepMinutes: 5 | 10 | 15 | 30; version: number };
+export type PublicBookingServiceDTO = Pick<ServiceDTO, "id" | "name" | "description" | "durationMinutes" | "pricingType" | "price" | "currency" | "staffSelectionMode"> & { staff?: Array<Pick<StaffSummaryDTO, "id" | "name">>; staffPage?: { limit: number; hasMore: boolean; nextOffset: number | null } };
+export type PublicBookingCatalogDTO = {
+  organization: { id: string; name: string; timezone: string; currency: string };
+  timeZone: string;
+  policy: { slotStepMinutes: 5 | 10 | 15 | 30; minNoticeMinutes: number; maxAdvanceDays: number; cancelNoticeMinutes: number };
+  services: PublicBookingServiceDTO[];
+};
+export type PublicBookingStaffPageDTO = { items: Array<Pick<StaffSummaryDTO, "id" | "name">>; pageInfo: { limit: number; offset: number; hasMore: boolean; nextOffset: number | null } };
+export type PublicAvailabilityQuery = { serviceId: string; selection: "SPECIFIC" | "ANY" | "NONE"; staffMemberId?: string; fromDate: string; toDate: string; cursor?: string };
+export type PublicAvailabilityDTO = AvailabilityDTO;
+export type PublicBookingCreateInput = { serviceId: string; startAt: string; assignment: AppointmentAssignment; customer: { name: string; phone?: string; email?: string } };
+export type PublicBookingReceiptDTO = { id: string; status: "CONFIRMED"; startAt: string; endAt: string; durationMinutes: number; serviceName: string; staffName: string | null; timeZone: string; version: number; managementToken: string };
+export type PublicManagedBookingDTO = {
+  id: string; serviceId: string; status: AppointmentDTO["status"]; startAt: string; endAt: string; durationMinutes: number;
+  serviceName: string; staffName: string | null; staffSelectionMode: "CUSTOMER_CHOICE" | "AUTO_ASSIGN" | "NO_ASSIGNMENT";
+  assignment: { kind: "SPECIFIC"; staffMemberId: string } | { kind: "ANY"; staffMemberId?: string } | { kind: "NONE" }; timeZone: string; version: number;
+  actions: { canCancel: boolean; canReschedule: boolean };
+};
+export type PublicRescheduleAvailabilityQuery = {
+  selection: "SPECIFIC" | "ANY" | "NONE"; staffMemberId?: string; fromDate: string; toDate: string; cursor?: string;
+};
+export type PublicRescheduleInput = { token: string; startAt: string; assignment: AppointmentAssignment };
+export type PublicCancelInput = { token: string; reasonCode: "CUSTOMER_REQUEST" };
+export type PublicManagedBookingResultDTO = { id: string; status: AppointmentDTO["status"]; startAt: string; endAt: string; durationMinutes: number; serviceName: string; staffName: string | null; timeZone: string; version: number };
+export type ApiErrorCode = "VALIDATION_ERROR" | "INVALID_TOKEN" | "INVALID_IDEMPOTENCY_KEY" | "IDEMPOTENCY_KEY_REUSED" | "UNAUTHENTICATED" | "INVALID_CREDENTIALS" | "CSRF_INVALID" | "EMAIL_UNVERIFIED" | "TRIAL_ALREADY_USED" | "PERMISSION_DENIED" | "SUBSCRIPTION_REQUIRED" | "ORGANIZATION_NOT_FOUND" | "BOOKING_NOT_AVAILABLE" | "MANAGEMENT_LINK_NOT_AVAILABLE" | "BOOKING_BUSY" | "SLUG_TAKEN" | "ONBOARDING_ALREADY_COMPLETED" | "IDEMPOTENCY_CONFLICT" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "CONTEXT_CHANGED" | "CANNOT_REMOVE_LAST_OWNER" | "MEMBER_NOT_FOUND" | "INVITATION_NOT_FOUND" | "ALREADY_MEMBER" | "EMAIL_MISMATCH" | "INVALID_INVITATION" | "CUSTOMER_NOT_FOUND" | "SERVICE_NOT_FOUND" | "SERVICE_CATEGORY_NOT_FOUND" | "STAFF_MEMBER_NOT_FOUND" | "SERVICE_NAME_TAKEN" | "SERVICE_CATEGORY_NAME_TAKEN" | "RELATED_ENTITY_INACTIVE" | "CURRENCY_CHANGE_REQUIRES_MIGRATION" | "VERSION_CONFLICT" | "SLOT_UNAVAILABLE" | "VERSION_MISMATCH" | "INVALID_APPOINTMENT_TRANSITION" | "SCHEDULE_HAS_BOOKINGS" | "BOOKING_CONFIGURATION_CHANGED" | "APPOINTMENT_NOT_FOUND";
 
 export type ApiErrorDTO = { code: ApiErrorCode; message: string; fieldErrors?: Record<string, string[]> };
 const errorCodes = new Set<string>([
   "VALIDATION_ERROR",
   "INVALID_TOKEN",
   "INVALID_IDEMPOTENCY_KEY",
+  "IDEMPOTENCY_KEY_REUSED",
+  "BOOKING_NOT_AVAILABLE",
+  "MANAGEMENT_LINK_NOT_AVAILABLE",
+  "BOOKING_BUSY",
   "UNAUTHENTICATED",
   "INVALID_CREDENTIALS",
   "CSRF_INVALID",
@@ -174,6 +223,12 @@ const errorCodes = new Set<string>([
   "RELATED_ENTITY_INACTIVE",
   "CURRENCY_CHANGE_REQUIRES_MIGRATION",
   "VERSION_CONFLICT",
+  "SLOT_UNAVAILABLE",
+  "VERSION_MISMATCH",
+  "INVALID_APPOINTMENT_TRANSITION",
+  "SCHEDULE_HAS_BOOKINGS",
+  "BOOKING_CONFIGURATION_CHANGED",
+  "APPOINTMENT_NOT_FOUND",
 ]);
 
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null; }

@@ -12,7 +12,7 @@ Nuari será un SaaS por suscripción que centralice la operación diaria de esto
 
 Nuari no se define únicamente como turnero ni como ecommerce. Su núcleo es una plataforma de gestión que puede combinar servicios y comercio.
 
-La primera interfaz de servicios se presenta como módulo **Turnero**: agenda, turnos y catálogo de servicios. La identidad visual del módulo es genérica para negocios con citas. El frontend también presenta Clientes, Caja y Equipo como secciones compartidas del espacio; sus operaciones reales, permisos y datos siguen pendientes de API. Clientes, caja y acceso de usuarios pertenecen al núcleo compartido, aunque el Turnero los utilice. Una eventual solución de hotelería o reservas por recursos tendría un flujo y calendario propios; todavía no forma parte del MVP aprobado.
+La primera interfaz de servicios se presenta como módulo **Turnero**: agenda, turnos y catálogo de servicios. La identidad visual del módulo es genérica para negocios con citas. Clientes, Servicios y Profesionales tienen persistencia API; Equipo administra accesos reales. Agenda y Caja conservan demostraciones locales. Clientes, caja y acceso de usuarios pertenecen al núcleo compartido, aunque el Turnero los utilice. Una eventual solución de hotelería o reservas por recursos tendría un flujo y calendario propios; todavía no forma parte del MVP aprobado.
 
 ## Usuarios objetivo iniciales
 

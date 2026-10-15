@@ -8,6 +8,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { OperationalAuditAction, OperationalAuditField } from '../organizations/organizations.service.js';
 import { OrganizationsService } from '../organizations/organizations.service.js';
 import type { TenantContext } from '../organizations/tenant.guard.js';
+import type { BookingScope } from '../availability/scheduling-read.service.js';
 import { CategoryStatusFilter, type CreateServiceCategoryDto, type ServiceCategoryListQueryDto, type UpdateServiceCategoryDto } from './service-categories.dto.js';
 import { isValidServicePrice, ServiceStatusFilter, type CreateServiceDto, type ServiceListQueryDto, type UpdateServiceDto } from './services.dto.js';
 import { serviceCategoryDto, serviceDto } from './services.mapper.js';
@@ -90,6 +91,15 @@ export class ServiceCatalogService {
 
   async requireService(context: TenantContext, serviceId: string, tx: TransactionContext = this.db) {
     const service = await tx.service.findFirst({ where: { id: serviceId, organizationId: context.organizationId } });
+    if (!service) throw serviceNotFound();
+    return service;
+  }
+
+  async getBookableService(scope: BookingScope, serviceId: string, tx: TransactionContext = this.db) {
+    const service = await tx.service.findFirst({
+      where: { id: serviceId, organizationId: scope.organizationId, active: true },
+      select: { id: true, organizationId: true, name: true, durationMinutes: true, staffSelectionMode: true, active: true, version: true, publicBookable: true },
+    });
     if (!service) throw serviceNotFound();
     return service;
   }

@@ -11,22 +11,27 @@ export type Permission =
   | 'services:read'
   | 'services:manage'
   | 'staff:read'
-  | 'staff:manage';
+  | 'staff:manage'
+  | 'scheduling:read'
+  | 'scheduling:book'
+  | 'scheduling:manage';
 
 const rolePermissions: Record<OrganizationRole, ReadonlySet<Permission>> = {
   OWNER: new Set([
     'customers:read', 'customers:create', 'customers:update', 'customers:archive', 'customers:notes',
     'services:read', 'services:manage',
     'staff:read', 'staff:manage',
+    'scheduling:read', 'scheduling:book', 'scheduling:manage',
   ]),
   ADMIN: new Set([
     'customers:read', 'customers:create', 'customers:update', 'customers:archive', 'customers:notes',
     'services:read', 'services:manage',
     'staff:read', 'staff:manage',
+    'scheduling:read', 'scheduling:book', 'scheduling:manage',
   ]),
   EMPLOYEE: new Set([
     'customers:read', 'customers:create', 'customers:update',
-    'services:read', 'staff:read',
+    'services:read', 'staff:read', 'scheduling:read', 'scheduling:book',
   ]),
 };
 

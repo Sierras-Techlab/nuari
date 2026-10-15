@@ -4,8 +4,10 @@ import { Clock } from '../common/clock.js';
 import { ApiError } from '../common/errors.js';
 import { parseIfMatch } from '../common/if-match.js';
 import { PrismaService } from '../database/prisma.service.js';
+import type { TransactionContext } from '../common/transaction.js';
 import { OrganizationsService } from '../organizations/organizations.service.js';
 import type { TenantContext } from '../organizations/tenant.guard.js';
+import type { BookingScope } from '../availability/scheduling-read.service.js';
 import { RelatedResourceStatus, type StaffServiceListQueryDto } from './staff-services.dto.js';
 import { staffServiceDto } from './staff-services.mapper.js';
 
@@ -39,6 +41,15 @@ export class StaffServicesService {
     private readonly organizations: OrganizationsService,
     private readonly clock: Clock,
   ) {}
+
+  async listEligibleStaff(scope: BookingScope, serviceId: string, tx: TransactionContext = this.db) {
+    const rows = await tx.staffService.findMany({
+      where: { organizationId: scope.organizationId, serviceId, staffMember: { active: true } },
+      select: { staffMember: { select: { id: true, name: true } } },
+      orderBy: { staffMemberId: 'asc' },
+    });
+    return rows.map(row => row.staffMember);
+  }
 
   async listForService(context: TenantContext, serviceId: string, query: StaffServiceListQueryDto) {
     const service = await this.db.service.findFirst({ where: { id: serviceId, organizationId: context.organizationId } });

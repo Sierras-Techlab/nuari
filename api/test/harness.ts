@@ -39,17 +39,21 @@ export function isolatedDatabaseEnvironment(env: NodeJS.ProcessEnv = process.env
   const databaseUrl = env.TEST_DATABASE_URL;
   const directUrl = env.TEST_DIRECT_URL;
   if (!databaseUrl || !directUrl) throw new Error('TEST_DATABASE_URL and TEST_DIRECT_URL are required; database suites never use runtime credentials.');
-  // Opt-in explícito para la rama Neon `dev` compartida: el id de endpoint debe coincidir exactamente (con o sin `-pooler`).
+  // Opt-in explícito para endpoints Neon autorizados: se exige el id exacto (con o sin `-pooler`).
   const sharedDevEndpoint = env.TEST_DATABASE_SHARED_DEV_ENDPOINT;
+  const isolatedNeonEndpoint = env.TEST_DATABASE_ISOLATED_NEON_ENDPOINT;
   if (sharedDevEndpoint !== undefined && !/^ep-[a-z0-9-]+$/.test(sharedDevEndpoint)) throw new Error('Invalid shared development endpoint.');
+  if (isolatedNeonEndpoint !== undefined && !/^ep-[a-z0-9-]+$/.test(isolatedNeonEndpoint)) throw new Error('Invalid isolated Neon endpoint.');
   const normalizedHost = (url: URL): string => url.hostname.replace(/^(ep-[a-z0-9-]+?)-pooler\./, '$1.');
   const validate = (value: string): URL => {
     let url: URL;
     try { url = new URL(value); } catch { throw new Error('Invalid isolated test database configuration.'); }
     const protocolOk = ['postgres:', 'postgresql:'].includes(url.protocol) && (url.searchParams.get('schema') ?? 'public') === 'public';
     const loopbackOk = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) && /^\/(?:[a-z0-9_]*test[a-z0-9_]*|nuari_task07)$/.test(url.pathname);
-    const sharedDevOk = sharedDevEndpoint !== undefined && normalizedHost(url).startsWith(`${sharedDevEndpoint}.`) && url.hostname.endsWith('.neon.tech');
-    if (!protocolOk || !(loopbackOk || sharedDevOk)) throw new Error('Database suites require a loopback-only explicitly named isolated test database.');
+    const neonHostOk = url.hostname.endsWith('.neon.tech');
+    const sharedDevOk = sharedDevEndpoint !== undefined && normalizedHost(url).startsWith(`${sharedDevEndpoint}.`) && neonHostOk;
+    const isolatedNeonOk = isolatedNeonEndpoint !== undefined && normalizedHost(url).startsWith(`${isolatedNeonEndpoint}.`) && neonHostOk;
+    if (!protocolOk || !(loopbackOk || sharedDevOk || isolatedNeonOk)) throw new Error('Database suites require a loopback-only explicitly named isolated test database.');
     return url;
   };
   const database = validate(databaseUrl);
@@ -90,8 +94,8 @@ export async function createApiHarness(options: { clock?: MutableClock; emailSen
   const db = app.get(PrismaService);
   try {
     await db.$connect();
-    const migrations = await db.$queryRaw<{ count: bigint }[]>`SELECT count(*) FROM "_prisma_migrations" WHERE "finished_at" IS NOT NULL AND "rolled_back_at" IS NULL`;
-    if (Number(migrations[0]?.count) < 3) throw new Error('Deploy the three API migrations to the isolated test database first.');
+    const migrations = await db.$queryRaw<{ count: bigint }[]>`SELECT count(*) FROM "_prisma_migrations" WHERE "finished_at" IS NOT NULL AND "rolled_back_at" IS NULL AND "migration_name" = '20261014211225_scheduling_appointments'`;
+    if (Number(migrations[0]?.count) !== 1) throw new Error('Deploy the scheduling appointments migration to the isolated test database first.');
   } catch {
     await app.close();
     throw new Error('Isolated test PostgreSQL is unavailable or migrations are missing. Runtime credentials were not used.');
@@ -132,6 +136,15 @@ export async function createApiHarness(options: { clock?: MutableClock; emailSen
     await db.$transaction(async tx => {
       await tx.onboardingSubmission.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { organizationId: { in: orgIds } }] } });
       await tx.trialGrant.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { organizationId: { in: orgIds } }] } });
+      await tx.bookingSubmission.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await tx.appointmentEvent.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await tx.appointment.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await tx.calendarOverrideWindow.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await tx.calendarDayOverride.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await tx.calendarWeeklyWindow.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await tx.calendarTimeOff.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await tx.bookingCalendar.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await tx.schedulingSettings.deleteMany({ where: { organizationId: { in: orgIds } } });
       await tx.organizationMember.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { organizationId: { in: orgIds } }] } });
       await tx.subscription.deleteMany({ where: { organizationId: { in: orgIds } } });
       await tx.session.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { activeOrganizationId: { in: orgIds } }] } });

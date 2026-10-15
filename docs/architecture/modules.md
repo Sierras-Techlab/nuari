@@ -16,7 +16,7 @@ Posee `OrganizationMember`, roles por organización y resolución del tenant con
 
 Responsable de usuarios, credenciales, sesiones, tokens de verificación/recuperación y autenticación. Expone identidad y capacidades de sesión; no asigna organización ni rol global. La membresía y su rol son propiedad de Organizations, en línea con ADR-005.
 
-Nuari implementa autenticación propia en NestJS conforme a [`ADR-005`](decisions/ADR-005-custom-authentication.md). FEAT-001 y FEAT-002 están cerradas tras validación manual de sus flujos principales; las limitaciones de correo y staging siguen documentadas en el snapshot y los problemas conocidos. FEAT-003 B1–B10 implementaron el esquema inicial, permisos base, APIs tenant-aware de clientes/categorías/servicios/personal, habilitaciones profesional–servicio y las pantallas persistentes de Clientes, Servicios y Profesionales, según TASK-09. La Agenda continúa usando datos locales de demostración.
+Nuari implementa autenticación propia en NestJS conforme a [`ADR-005`](decisions/ADR-005-custom-authentication.md). FEAT-001 y FEAT-002 están cerradas tras validación manual de sus flujos principales; las limitaciones de correo y staging siguen documentadas en el snapshot y los problemas conocidos. FEAT-003 B1–B10 implementaron el esquema inicial, permisos base, APIs tenant-aware de clientes/categorías/servicios/personal, habilitaciones profesional–servicio y las pantallas persistentes de Clientes, Servicios y Profesionales, según TASK-09. La Agenda administrativa está integrada con FEAT-004; Caja conserva su demostración local.
 
 ### Staff
 
@@ -60,7 +60,11 @@ Responsable de profesionales, reglas de disponibilidad y excepciones.
 
 ### Appointments
 
-Responsable de agenda, reservas, estados, cancelaciones y asociación opcional con una venta.
+Responsable de agenda, reservas, estados, cancelaciones y asociación opcional con una venta. La pantalla `/app/agenda` consume los endpoints existentes de appointments/availability y catálogos; `GET /organizations/:id/scheduling/calendars` devuelve horarios, excepciones y ausencias del tenant para dibujar el calendario.
+
+FEAT-004 B1–B7 están implementados: el esquema está aplicado en Neon `Feat10` aislado; `TimeZoneAdapter` concentra conversión IANA/DST y política de tiempo; `AvailabilityModule` ofrece configuración, calendarios y disponibilidad privada/pública para SPECIFIC/ANY/NONE. `AppointmentsModule` crea citas internas con cliente activo y ciclo de vida versionado: cancelación, cierre administrativo, corrección auditada e reprogramación transaccional. La asignación ANY se coordina por organización/día local, cuenta CONFIRMED/COMPLETED y desempata por UUID. `PublicBookingModule` publica sólo catálogo opt-in y disponibilidad pública con política vigente; crea Guest Customer y Appointment atómicamente; gestiona, cancela y reprograma una única reserva con bearer HMAC revocable persistido como hash. CSRF, rate limits y proyecciones acotadas se aplican también al público. `SchedulingReadModule` sólo depende de DatabaseModule, proyecta intervalos y bloquea cambios de zona mientras haya reservas futuras/en curso o reglas locales definidas. [ADR-008](decisions/ADR-008-scheduling-personalization.md) y [ADR-009](decisions/ADR-009-scheduling-core-decisions.md) registran las reglas aprobadas. Duración pertenece a Service y determina ocupación; intervalo sólo genera candidatos. Cambiar configuración no modifica reservas confirmadas ni sus condiciones de cancelación. El detalle contractual de los bloques está en [TASK-10](../tasks/TASK-10-feat-004-scheduling-availability-appointments.md).
+
+Las reglas de dominio y precisiones de TASK-10 sección 1.6 están aprobadas. B3 habilita lectura de configuración a roles con acceso al negocio y gestión de settings/calendarios sólo OWNER/ADMIN; `SchedulingRead` consulta ocupaciones sin importar Appointments. Calendar/Availability calcula slots UTC sobre calendarios locales, duración real y capacidad tenant-aware. B5 crea CONFIRMED y su evento CREATED atómicamente. B6 implementa historial y transiciones controladas; B7 implementa las capacidades públicas. B8a integra Agenda diaria/semanal con reservas, disponibilidad y calendarios reales, y espera revisión; B8b/B9 siguen pendientes.
 
 ### Commissions
 

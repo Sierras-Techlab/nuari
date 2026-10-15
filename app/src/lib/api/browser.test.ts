@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { apiMutation, apiPatchVersioned, apiPut, clearCsrfToken, createOrganization, createStaffMember, getSnapshot, getStaffMember, getStaffMemberServices, login, logout, updateStaffMember } from "./browser";
+import { apiMutation, apiPatchVersioned, apiPut, cancelPublicBooking, clearCsrfToken, createOrganization, createPublicBooking, createStaffMember, getPublicAvailability, getPublicBookingCatalog, getPublicBookingStaff, getPublicManagedBooking, getPublicRescheduleAvailability, getSnapshot, getStaffMember, getStaffMemberServices, login, logout, reschedulePublicBooking, updateStaffMember } from "./browser";
 import { ApiError } from "./errors";
 import { isApiErrorDTO } from "./contracts";
 import { accessFixture } from "@/test/access-fixtures";
@@ -53,6 +53,38 @@ describe("same-origin mutation transport", () => {
     expect(get.mock.calls[1]?.[0]).toBe("/organizations/org%2F1/staff/staff-1/services");
     expect(post).toHaveBeenCalledWith("/organizations/org%2F1/staff", { name: "Sofía", email: null, phone: null }, { headers: { "X-CSRF-Token": "csrf-1" } });
     expect(patch).toHaveBeenCalledWith("/organizations/org%2F1/staff/staff-1", { active: false }, { headers: { "If-Match": '"7"', "X-CSRF-Token": "csrf-1" } });
+  });
+  it("uses the public booking contracts and keeps idempotency and version headers", async () => {
+    const signal = new AbortController().signal;
+    const slotQuery = { serviceId: "service-1", selection: "SPECIFIC" as const, staffMemberId: "staff-1", fromDate: "2027-05-14", toDate: "2027-05-15" };
+    get.mockResolvedValueOnce({ data: { organization: { name: "Estudio" } } })
+      .mockResolvedValueOnce({ data: { items: [], pageInfo: { hasMore: false, nextOffset: null } } })
+      .mockResolvedValueOnce({ data: { slots: [], hasMore: false, nextCursor: null, timeZone: "America/Argentina/Buenos_Aires" } });
+    await getPublicBookingCatalog("estudio sur", signal);
+    await getPublicBookingStaff("estudio sur", "service-1", 50, signal);
+    await getPublicAvailability("estudio sur", slotQuery, signal);
+    expect(get.mock.calls[0]?.[0]).toBe("/public/booking/estudio%20sur/catalog");
+    expect(get.mock.calls[0]?.[1]).toMatchObject({ signal });
+    expect(get.mock.calls[1]?.[0]).toBe("/public/booking/estudio%20sur/services/service-1/staff");
+    expect(get.mock.calls[1]?.[1]).toMatchObject({ params: { offset: 50 }, signal });
+    expect(get.mock.calls[2]?.[0]).toBe("/public/booking/estudio%20sur/availability");
+    expect(get.mock.calls[2]?.[1]).toMatchObject({ params: slotQuery, signal });
+
+    const payload = { serviceId: "service-1", startAt: "2027-05-14T16:00:00-03:00", assignment: { kind: "SPECIFIC" as const, staffMemberId: "staff-1" }, customer: { name: "Ada", phone: "+541155551111" } };
+    await createPublicBooking("estudio sur", payload, "immutable-key");
+    expect(post).toHaveBeenCalledWith("/public/booking/estudio%20sur/appointments", payload, { headers: { "Idempotency-Key": "immutable-key", "X-CSRF-Token": "csrf-1" } });
+  });
+  it("uses token-bound public management routes and carries If-Match on availability and mutations", async () => {
+    const token = "private-management-token";
+    const availabilityQuery = { selection: "SPECIFIC" as const, staffMemberId: "staff-1", fromDate: "2027-05-20", toDate: "2027-05-21" };
+    await getPublicManagedBooking("estudio", token);
+    await getPublicRescheduleAvailability("estudio", "appointment-1", token, availabilityQuery, 7);
+    await reschedulePublicBooking("estudio", "appointment-1", { token, startAt: "2027-05-21T13:00:00-03:00", assignment: { kind: "SPECIFIC", staffMemberId: "staff-1" } }, 7);
+    await cancelPublicBooking("estudio", "appointment-1", { token, reasonCode: "CUSTOMER_REQUEST" }, 7);
+    expect(post).toHaveBeenNthCalledWith(1, "/public/booking/estudio/manage/resolve", { token }, { headers: { "X-CSRF-Token": "csrf-1" } });
+    expect(post).toHaveBeenNthCalledWith(2, "/public/booking/estudio/manage/appointment-1/availability", { token, ...availabilityQuery }, { headers: { "If-Match": '"7"', "X-CSRF-Token": "csrf-1" } });
+    expect(post).toHaveBeenNthCalledWith(3, "/public/booking/estudio/manage/appointment-1/reschedule", expect.objectContaining({ token }), { headers: { "If-Match": '"7"', "X-CSRF-Token": "csrf-1" } });
+    expect(post).toHaveBeenNthCalledWith(4, "/public/booking/estudio/manage/appointment-1/cancel", { token, reasonCode: "CUSTOMER_REQUEST" }, { headers: { "If-Match": '"7"', "X-CSRF-Token": "csrf-1" } });
   });
   it.each(["CUSTOMER_NOT_FOUND", "VERSION_CONFLICT", "SERVICE_NOT_FOUND", "RELATED_ENTITY_INACTIVE", "CURRENCY_CHANGE_REQUIRES_MIGRATION"] as const)("recognizes operational API error %s", (code) => {
     expect(isApiErrorDTO({ code, message: "No se pudo completar la operación." })).toBe(true);

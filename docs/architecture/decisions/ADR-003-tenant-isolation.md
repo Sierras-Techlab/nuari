@@ -9,7 +9,9 @@ Nuari alojará múltiples negocios. Se necesita impedir que una organización ac
 
 ## Decisión
 
-Utilizar una base PostgreSQL compartida. Las entidades operativas tendrán `organizationId` y todas las operaciones se ejecutarán con un tenant context derivado de una membresía autorizada.
+Utilizar una base PostgreSQL compartida. Las entidades operativas tendrán `organizationId`. Las operaciones privadas se ejecutarán con un tenant context derivado de una membresía autorizada.
+
+La reserva pública sin cuenta y su gestión por enlace seguro están aprobadas en [ADR-008](ADR-008-scheduling-personalization.md) y [ADR-009](ADR-009-scheduling-core-decisions.md), aún sin implementar. Su contexto de organización debe proceder de una capacidad pública explícita y acotada, nunca de una membresía ficticia ni de un organizationId confiado del body. El enlace sólo permite gestionar su reserva; no concede acceso privado a clientes, personal o agenda. Los detalles de publicación, token y excepciones de suscripción siguen propuestos en TASK-10. Esta extensión del diseño no debilita membresía/permisos de rutas privadas ni los filtros/FK tenant-aware.
 
 Las restricciones, índices, consultas y pruebas serán tenant-aware. PostgreSQL Row-Level Security podrá agregarse más adelante como defensa en profundidad, no como sustituto de la autorización de aplicación.
 

@@ -1,253 +1,261 @@
 "use client";
 
-import { ArrowLeft } from "@phosphor-icons/react/dist/csr/ArrowLeft";
-import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight";
-import { CalendarBlank } from "@phosphor-icons/react/dist/csr/CalendarBlank";
-import { CalendarDots } from "@phosphor-icons/react/dist/csr/CalendarDots";
-import { Clock } from "@phosphor-icons/react/dist/csr/Clock";
-import { Plus } from "@phosphor-icons/react/dist/csr/Plus";
-import { Sparkle } from "@phosphor-icons/react/dist/csr/Sparkle";
-import { Users } from "@phosphor-icons/react/dist/csr/Users";
-import { useEffect, useRef, useState } from "react";
-
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAccess } from "@/features/access/access-provider";
 import { Button } from "@/components/ui/button";
+import { CaretLeft } from "@phosphor-icons/react/dist/csr/CaretLeft";
+import { CaretRight } from "@phosphor-icons/react/dist/csr/CaretRight";
+import { Funnel } from "@phosphor-icons/react/dist/csr/Funnel";
+import { Plus } from "@phosphor-icons/react/dist/csr/Plus";
+import { Clock } from "@phosphor-icons/react/dist/csr/Clock";
 import { EmptyState, ErrorState, LoadingState } from "@/components/states/page-states";
-import { AppointmentPanel } from "./appointment-panel";
-import { DEMO_DATE } from "./demo-source";
-import { useDemoAppointmentSource } from "./demo-provider";
-import { AppointmentSourceError, type Appointment, type AppointmentInput, type AppointmentSetup, type AppointmentSource } from "./types";
+import type { AppointmentDTO, OrganizationRole } from "@/lib/api/contracts";
 import { ApiError } from "@/lib/api/errors";
+import { addDate, loadAgendaAppointments, loadAgendaSetup, localDateLabel, localDateTime, localMinute } from "./agenda-data";
+import { AgendaPanel } from "./agenda-panel";
+import styles from "./agenda.module.css";
 
-type PanelState =
-  | { mode: "new" }
-  | { mode: "detail" | "reschedule" | "confirm"; id: string };
+type Mode = "DAY" | "WEEK";
+type PanelState = { mode: "new" } | { mode: "detail" | "reschedule" | "cancel-confirm"; id: string };
+const hourHeight = 80;
 
-function requireSource(source: AppointmentSource | null): AppointmentSource {
-  if (!source) throw new Error("Authorized appointment source is required.");
-  return source;
-}
-
-function addDays(date: string, amount: number): string {
-  const parsed = new Date(date + "T12:00:00Z");
-  parsed.setUTCDate(parsed.getUTCDate() + amount);
-  return parsed.toISOString().slice(0, 10);
-}
-
-function formatDate(date: string): string {
-  const label = new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(date + "T12:00:00Z"));
-  return label[0].toLocaleUpperCase("es-AR") + label.slice(1);
-}
-
-function feedbackFor(error: unknown): string {
-  if (error instanceof AppointmentSourceError && error.code === "SLOT_TAKEN") {
-    return "Ese horario está ocupado para el profesional elegido. Probá con otra hora.";
-  }
-  return error instanceof Error ? error.message : "No pudimos completar la acción. Intentá nuevamente.";
-}
-
-export function AgendaScreen({ source }: { source?: AppointmentSource }) {
-  const sharedDemoSource = useDemoAppointmentSource();
-  const dataSource = requireSource(source ?? sharedDemoSource);
-  const appointmentSource: AppointmentSource = dataSource;
-  const [date, setDate] = useState(DEMO_DATE);
+export function AgendaScreen() {
+  const { snapshot, preflight } = useAccess();
+  const organizationId = snapshot?.activeOrganizationId ?? null;
+  const userId = snapshot?.user.id ?? null;
+  const role: OrganizationRole = snapshot?.memberships.find((member) => member.organization.id === organizationId)?.role ?? "EMPLOYEE";
+  const contextRef = useRef<{ organizationId: string; userId: string } | null>(null);
+  const preflightRef = useRef(preflight);
+  const [setup, setSetup] = useState<Awaited<ReturnType<typeof loadAgendaSetup>> | null>(null);
+  const [appointments, setAppointments] = useState<AppointmentDTO[]>([]);
+  const [date, setDate] = useState(() => todayDate());
+  const [mode, setMode] = useState<Mode>("DAY");
   const [staffFilter, setStaffFilter] = useState("");
-  const [setup, setSetup] = useState<AppointmentSetup | null>(null);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [setupLoading, setSetupLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelState | null>(null);
-  const [panelError, setPanelError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [revision, setRevision] = useState(0);
+  const [setupRevision, setSetupRevision] = useState(0);
   const contextRetries = useRef(0);
+  const dateInitialized = useRef(false);
+
+  useEffect(() => { contextRef.current = organizationId && userId ? { organizationId, userId } : null; preflightRef.current = preflight; }, [organizationId, userId, preflight]);
+  const isCurrent = (context: { organizationId: string; userId: string }) => contextRef.current?.organizationId === context.organizationId && contextRef.current.userId === context.userId;
 
   useEffect(() => {
+    const context = organizationId && userId ? { organizationId, userId } : null;
+    const controller = new AbortController();
     let active = true;
-    Promise.all([appointmentSource.getSetup(), appointmentSource.list(date)]).then(([loadedSetup, loadedAppointments]) => {
-      if (!active) return;
-      setSetup(loadedSetup);
-      setAppointments(loadedAppointments);
-      contextRetries.current = 0;
-      setLoadError(null);
-      setLoading(false);
-    }).catch((error: unknown) => {
-      if (!active) return;
-      if (error instanceof ApiError && error.code === "CONTEXT_CHANGED") {
-        if (contextRetries.current === 0) {
-          contextRetries.current = 1;
-          setRefreshKey((key) => key + 1);
-          return;
-        }
-      }
-      setLoadError(feedbackFor(error));
-      setLoading(false);
-    });
-    return () => { active = false; };
-  }, [appointmentSource, date, refreshKey]);
+    if (!context) return () => { active = false; controller.abort(); };
+    void (async () => {
+      try {
+        await preflightRef.current();
+        if (!active || !isCurrent(context)) return;
+        const result = await loadAgendaSetup(context.organizationId, controller.signal);
+        if (active && isCurrent(context)) { setSetup(result); if (!dateInitialized.current) { setDate(todayDate(result.timeZone)); dateInitialized.current = true; } }
+      } catch (reason) { if (active && !controller.signal.aborted && isCurrent(context)) setError(errorMessage(reason)); }
+      finally { if (active && isCurrent(context)) setSetupLoading(false); }
+    })();
+    return () => { active = false; controller.abort(); };
+  }, [organizationId, userId, setupRevision]);
 
-  function changeDate(nextDate: string) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(nextDate) || Number.isNaN(new Date(nextDate + "T12:00:00Z").getTime())) return;
-    setLoading(true);
-    setDate(nextDate);
-    setNotice(null);
-  }
+  const range = useMemo(() => {
+    if (mode === "DAY") return { fromDate: date, toDate: addDate(date, 1), days: [date] };
+    const first = mondayOf(date);
+    return { fromDate: first, toDate: addDate(first, 7), days: Array.from({ length: 7 }, (_, index) => addDate(first, index)) };
+  }, [date, mode]);
 
-  function openPanel(next: PanelState) {
-    setPanelError(null);
-    setPanel(next);
-  }
+  useEffect(() => {
+    const context = organizationId && userId ? { organizationId, userId } : null;
+    const controller = new AbortController();
+    let active = true;
+    if (!context) return () => { active = false; controller.abort(); };
+    void (async () => {
+      try {
+        await preflightRef.current();
+        if (!active || !isCurrent(context)) return;
+        const result = await loadAgendaAppointments(context.organizationId, { fromDate: range.fromDate, toDate: range.toDate }, controller.signal);
+        if (active && isCurrent(context)) { setAppointments(result); contextRetries.current = 0; }
+      } catch (reason) {
+        if (!active || controller.signal.aborted || !isCurrent(context)) return;
+        if (reason instanceof ApiError && reason.code === "CONTEXT_CHANGED" && contextRetries.current === 0) { contextRetries.current = 1; setRevision((value) => value + 1); return; }
+        setError(errorMessage(reason));
+      } finally { if (active && isCurrent(context)) setLoading(false); }
+    })();
+    return () => { active = false; controller.abort(); };
+  }, [organizationId, userId, range.fromDate, range.toDate, revision]);
 
-  function closePanel() {
-    if (busy) return;
-    setPanel(null);
-    setPanelError(null);
-  }
+  const visible = useMemo(() => appointments.filter((item) => (!staffFilter || item.staffMemberId === staffFilter) && (!statusFilter || item.status === statusFilter)), [appointments, staffFilter, statusFilter]);
+  const selected = panel && "id" in panel ? appointments.find((item) => item.id === panel.id) : undefined;
+  const onChanged = useCallback((updated: AppointmentDTO, message: string) => {
+    setPanel(null); setNotice(message); setLoading(true); setError(null); setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item)); setRevision((value) => value + 1);
+  }, []);
 
-  async function create(input: AppointmentInput) {
-    setBusy(true);
-    setPanelError(null);
-    try {
-      await appointmentSource.create(input);
-      setPanel(null);
-      setStaffFilter("");
-      if (input.date !== date) changeDate(input.date);
-      setNotice("Turno guardado");
-      setRefreshKey((key) => key + 1);
-    } catch (error) {
-      setPanelError(feedbackFor(error));
-    } finally {
-      setBusy(false);
-    }
-  }
+  function navigate(amount: number) { setLoading(true); setError(null); setDate(addDate(date, amount * (mode === "DAY" ? 1 : 7))); setNotice(null); }
+  function changeDate(value: string) { if (/^\d{4}-\d{2}-\d{2}$/.test(value) && validDate(value)) { setLoading(true); setError(null); setDate(value); setNotice(null); } }
+  function changeMode(next: Mode) { if (next !== mode) { setLoading(true); setError(null); setMode(next); } }
+  function retry() { setError(null); setLoading(true); setSetupLoading(true); setSetupRevision((value) => value + 1); setRevision((value) => value + 1); }
+  const calendarColumns = mode === "DAY" ? dayColumns(setup, staffFilter).map((column) => ({ ...column, date })) : range.days.map((day) => ({ id: day, label: localDateLabel(day, { weekday: "short", day: "numeric" }), staffMemberId: null as string | null, date: day }));
+  const timeRange = computeTimeRange(setup, visible);
+  const canCreate = !loading && !!setup && (!!setup.services.length) && !error;
 
-  async function reschedule(slot: Pick<Appointment, "date" | "time">) {
-    if (!panel || !("id" in panel)) return;
-    setBusy(true);
-    setPanelError(null);
-    try {
-      await appointmentSource.reschedule(panel.id, slot);
-      setPanel(null);
-      setStaffFilter("");
-      if (slot.date !== date) changeDate(slot.date);
-      setNotice("Turno reprogramado");
-      setRefreshKey((key) => key + 1);
-    } catch (error) {
-      setPanelError(feedbackFor(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function cancel() {
-    if (!panel || !("id" in panel)) return;
-    setBusy(true);
-    setPanelError(null);
-    try {
-      await appointmentSource.cancel(panel.id);
-      setPanel(null);
-      setNotice("Turno cancelado");
-      setRefreshKey((key) => key + 1);
-    } catch (error) {
-      setPanelError(feedbackFor(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const selectedAppointment = panel && "id" in panel ? appointments.find((item) => item.id === panel.id) : undefined;
-  const visible = appointments.filter((item) => !staffFilter || item.staffId === staffFilter);
-  const active = visible.filter((item) => item.status === "scheduled");
-  const activeTotal = appointments.filter((item) => item.status === "scheduled").length;
-  const professionals = new Set(appointments.filter((item) => item.status === "scheduled").map((item) => item.staffId)).size;
-
-  return (
-    <div className="space-y-7 pb-12 text-[#182026]">
-      <header className="relative overflow-hidden rounded-[28px] border border-[#E4E9E7] bg-white px-6 py-8 shadow-[0_20px_50px_-38px_rgba(24,32,38,.24)] sm:px-9 sm:py-9">
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-grid-pattern opacity-35" />
-        <div aria-hidden="true" className="absolute -right-16 -top-24 size-64 rounded-full bg-[#DDF6E8]/50 blur-2xl" />
-        <div aria-hidden="true" className="absolute -bottom-32 right-36 size-56 rounded-full bg-[#E8F0FF]/60 blur-2xl" />
-        <div className="relative flex flex-col justify-between gap-7 sm:flex-row sm:items-end">
-          <div>
-            <p className="inline-flex items-center gap-2 rounded-full border border-[#DDF6E8] bg-[#EFFBF4] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.17em] text-[#35645D]"><Sparkle size={14} weight="fill" /> Turnero / Agenda</p>
-            <h1 className="mt-5 max-w-xl text-3xl font-bold tracking-[-0.045em] sm:text-[2.65rem]">Cada turno, en su lugar.</h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-[#667078]">Organizá el día, encontrá lo que necesitás y resolvé cambios con claridad.</p>
-          </div>
-          <Button onClick={() => openPanel({ mode: "new" })} disabled={loading || !!loadError || !setup} className="h-11 shrink-0 rounded-xl bg-[#182026] px-5 text-white shadow-[0_8px_24px_-12px_rgba(24,32,38,.55)] hover:bg-[#2A3742]"><Plus size={17} weight="bold" /> Nuevo turno</Button>
-        </div>
-      </header>
-
-      {notice ? <div role="status" className="rounded-xl border border-[#cfe6d1] bg-[#eaf7e8] px-4 py-3 text-sm font-semibold text-[#2f6742]">{notice}</div> : null}
-
-      <section aria-label="Resumen de la jornada" className="grid gap-3 sm:grid-cols-3">
-        <SummaryCard icon={<CalendarBlank size={20} />} tone="mint" label="Turnos activos" value={String(activeTotal).padStart(2, "0")} detail="En la fecha seleccionada" />
-        <SummaryCard icon={<Users size={20} />} tone="blue" label="Profesionales" value={String(professionals).padStart(2, "0")} detail="Con turnos en agenda" />
-        <SummaryCard icon={<Clock size={20} />} tone="lavender" label="Próximo bloque" value={active[0]?.time ?? "—"} detail={active[0] ? "Primer turno visible" : "Sin turnos visibles"} />
-      </section>
-
-      <section aria-labelledby="agenda-title" className="overflow-hidden rounded-[26px] border border-[#e0e8df] bg-white shadow-[0_18px_46px_-38px_rgba(26,60,36,.5)]">
-        <div className="border-b border-[#edf0ea] px-5 py-5 sm:px-7 sm:py-6">
-          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-            <div>
-              <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-[#438C78]"><CalendarDots size={16} weight="duotone" /> Agenda de turnos</p>
-              <h2 id="agenda-title" className="mt-1 text-2xl font-bold tracking-tight">Tu día en orden</h2>
-              <p className="mt-1 text-sm text-[#748178]">Consultá y gestioná cada cita desde un solo lugar.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" aria-label="Día anterior" onClick={() => changeDate(addDays(date, -1))} className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dfe7dd] bg-white text-[#426149] hover:bg-[#f3f8f0]"><ArrowLeft size={16} /></button>
-              <label className="sr-only" htmlFor="agenda-date">Ir a fecha</label>
-              <input id="agenda-date" type="date" value={date} onChange={(event) => changeDate(event.target.value)} className="h-10 rounded-xl border border-[#dfe7dd] bg-[#f9fbf7] px-3 text-sm font-bold text-[#294734]" />
-              <button type="button" aria-label="Siguiente día" onClick={() => changeDate(addDays(date, 1))} className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dfe7dd] bg-white text-[#426149] hover:bg-[#f3f8f0]"><ArrowRight size={16} /></button>
-            </div>
+  return <main className={`${styles.agenda} flex min-h-[calc(100vh-5rem)] flex-col bg-[#F8FAF9] text-[#182026]`}>
+    <header className="z-20 flex shrink-0 flex-col gap-4 border-b border-[#E4E9E7] bg-white px-4 py-4 shadow-sm md:px-7 md:py-5">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><h1 className="text-2xl font-bold tracking-tight">Agenda</h1><span aria-hidden="true" className="hidden h-6 w-px bg-[#E4E9E7] sm:block" />
+          <div className="flex items-center gap-3"><div className="flex items-center rounded-xl border border-[#E4E9E7] p-1"><button type="button" aria-label={mode === "DAY" ? "Día anterior" : "Semana anterior"} onClick={() => navigate(-1)} className="rounded-lg p-2 text-[#667078] hover:bg-[#F8FAF9]"><CaretLeft size={17} /></button><button type="button" onClick={() => { setDate(todayDate()); setNotice(null); }} className="rounded-lg px-3 py-1.5 text-sm font-semibold hover:bg-[#F8FAF9]">Hoy</button><button type="button" aria-label={mode === "DAY" ? "Día siguiente" : "Semana siguiente"} onClick={() => navigate(1)} className="rounded-lg p-2 text-[#667078] hover:bg-[#F8FAF9]"><CaretRight size={17} /></button></div>
+            <label className="sr-only" htmlFor="agenda-date">Fecha de agenda</label><input id="agenda-date" type="date" value={date} onChange={(event) => changeDate(event.target.value)} className="max-w-[160px] rounded-lg border border-[#E4E9E7] bg-[#F8FAF9] px-2 py-2 text-sm font-semibold" />
+            <span className="hidden text-sm font-bold capitalize text-[#182026] lg:block">{mode === "DAY" ? localDateLabel(date) : `${localDateLabel(range.fromDate, { day: "numeric", month: "short" })} – ${localDateLabel(addDate(range.toDate, -1), { day: "numeric", month: "short", year: "numeric" })}`}</span>
           </div>
         </div>
+        <div className="flex items-center gap-3"><div role="group" aria-label="Vista de agenda" className="flex shrink-0 rounded-xl border border-[#E4E9E7] bg-white p-1"><button type="button" aria-pressed={mode === "DAY"} onClick={() => changeMode("DAY")} className={modeButton(mode === "DAY")}>Día</button><button type="button" aria-pressed={mode === "WEEK"} onClick={() => changeMode("WEEK")} className={modeButton(mode === "WEEK")}>Semana</button></div><Button onClick={() => { setNotice(null); setPanel({ mode: "new" }); }} disabled={!canCreate} className="ml-auto shrink-0 bg-[#182026] text-white hover:bg-[#2A3742]"><Plus size={17} weight="bold" /><span className="hidden sm:inline">Nuevo turno</span></Button></div>
+      </div>
+      <div className="flex items-center gap-3 overflow-x-auto pb-1"><div className="relative shrink-0"><Funnel size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#667078]" /><label className="sr-only" htmlFor="agenda-staff-filter">Filtrar profesional</label><select id="agenda-staff-filter" value={staffFilter} onChange={(event) => setStaffFilter(event.target.value)} className="min-w-48 rounded-xl border border-[#E4E9E7] bg-white py-2 pl-9 pr-3 text-sm"><option value="">Todos los profesionales</option>{setup?.staff.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></div><label className="sr-only" htmlFor="agenda-status-filter">Filtrar estado</label><select id="agenda-status-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="min-w-36 rounded-xl border border-[#E4E9E7] bg-white px-3 py-2 text-sm"><option value="">Todos los estados</option><option value="CONFIRMED">Confirmados</option><option value="COMPLETED">Completados</option><option value="CANCELLED">Cancelados</option><option value="NO_SHOW">Ausencias</option></select><span className="ml-auto hidden items-center gap-1 text-xs text-[#667078] md:flex"><Clock size={14} /> {setup ? `${setup.slotStepMinutes} min · ${setup.timeZone}` : ""}</span></div>
+    </header>
 
-        <div className="flex flex-col gap-4 border-b border-[#edf0ea] bg-[#fbfcf9] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-          <div><p className="text-lg font-bold tracking-tight">{formatDate(date)}</p><p className="text-xs font-medium text-[#829087]">{activeTotal} {activeTotal === 1 ? "turno" : "turnos"}</p></div>
-          <div className="flex items-center gap-2"><Users size={18} className="text-[#7EA8F8]" /><label htmlFor="staff-filter" className="sr-only">Filtrar por profesional</label><select id="staff-filter" value={staffFilter} onChange={(event) => setStaffFilter(event.target.value)} className="h-10 min-w-44 rounded-xl border border-[#E4E9E7] bg-white px-3 text-sm font-semibold text-[#182026]"><option value="">Todo el equipo</option>{setup?.staff.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></div>
-        </div>
-
-        <div className="min-h-[360px] px-5 py-6 sm:px-7">
-          {loading ? <LoadingState label="Cargando agenda" /> : loadError ? <ErrorState title="No pudimos cargar la agenda" description={loadError} action={<Button variant="outline" onClick={() => { setLoading(true); setRefreshKey((key) => key + 1); }}>Reintentar</Button>} /> : visible.length === 0 ? <EmptyState title="No hay turnos para esta fecha" description={staffFilter ? "Probá con otro profesional o elegí un día diferente." : "Elegí otro día o registrá el primer turno de esta jornada."} action={<Button variant="outline" onClick={() => openPanel({ mode: "new" })}>Crear turno</Button>} /> : (
-            <ol className="space-y-0">
-              {visible.map((item, index) => {
-                const service = setup?.services.find((entry) => entry.id === item.serviceId);
-                const person = setup?.staff.find((entry) => entry.id === item.staffId);
-                return <li key={item.id} className="relative grid grid-cols-[55px_1fr] gap-3 pb-4 last:pb-0 sm:grid-cols-[80px_1fr] sm:gap-5">
-                  {index < visible.length - 1 ? <span aria-hidden="true" className="absolute bottom-0 left-[68px] top-7 hidden w-px bg-[#dce9db] sm:block" /> : null}
-                  <div className="pt-4 text-right"><span className="text-sm font-bold text-[#365744]">{item.time}</span></div>
-                  <button type="button" aria-label={"Ver turno de " + item.customerName} onClick={() => openPanel({ mode: "detail", id: item.id })} className={"group flex w-full flex-col justify-between gap-4 rounded-2xl border px-4 py-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5c9871] sm:flex-row sm:items-center sm:px-5 " + (item.status === "cancelled" ? "border-[#ece6e1] bg-[#faf7f5] opacity-75" : "border-[#dfe9df] bg-[#fbfdf9] hover:border-[#abd4b5]")}>
-                    <span className="flex min-w-0 items-center gap-3"><span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e5f2e5] text-xs font-bold text-[#447353]">{item.customerName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><span className="min-w-0"><span className="block truncate text-sm font-bold text-[#243b2f]">{item.customerName}</span><span className="mt-1 block truncate text-xs text-[#738077]">{service?.name || "Servicio"} · {service?.durationMinutes || 0} min</span></span></span>
-                    <span className="flex items-center gap-3"><span className="text-xs font-semibold text-[#5b7462]">{person?.name || "Profesional"}</span><span className={"rounded-full px-2.5 py-1 text-[11px] font-bold " + (item.status === "cancelled" ? "bg-[#f1e8e4] text-[#9a6559]" : "bg-[#e2f3e6] text-[#31734d]")}>{item.status === "cancelled" ? "Cancelado" : "Confirmado"}</span><ArrowRight size={16} className="text-[#78927e] transition-transform group-hover:translate-x-1" /></span>
-                  </button>
-                </li>;
-              })}
-            </ol>
-          )}
-        </div>
-      </section>
-
-      {panel && setup ? <AppointmentPanel
-        key={panel.mode + ("id" in panel ? panel.id : "")}
-        mode={panel.mode}
-        appointment={selectedAppointment}
-        setup={setup}
-        currentDate={date}
-        busy={busy}
-        error={panelError}
-        onClose={closePanel}
-        onBack={() => { if (panel && "id" in panel) openPanel({ mode: "detail", id: panel.id }); }}
-        onCreate={create}
-        onEdit={() => { if (panel && "id" in panel) openPanel({ mode: "reschedule", id: panel.id }); }}
-        onAskCancel={() => { if (panel && "id" in panel) openPanel({ mode: "confirm", id: panel.id }); }}
-        onReschedule={reschedule}
-        onCancel={cancel}
-      /> : null}
+    <div className="flex min-h-0 flex-1 flex-col gap-3 px-2 py-4 md:px-6 md:py-5">
+      {notice ? <div role="status" className="rounded-xl border border-[#CDE8D5] bg-[#EFFBF4] px-4 py-3 text-sm font-semibold text-[#356B4A]">{notice}</div> : null}
+      {setupLoading ? <LoadingState label="Cargando calendario" /> : error && !setup ? <ErrorState title="No pudimos cargar la agenda" description={error} action={<Button variant="outline" onClick={retry}>Reintentar</Button>} /> : loading ? <LoadingState label="Cargando reservas" /> : error ? <ErrorState title="No pudimos cargar las reservas" description={error} action={<Button variant="outline" onClick={retry}>Reintentar</Button>} /> : !setup ? <LoadingState label="Cargando calendario" /> : !setup.services.length ? <EmptyState title="No hay servicios disponibles" description="Agregá un servicio activo para crear reservas internas." /> : !setup.staff.length && !setup.services.some((service) => service.staffSelectionMode === "NO_ASSIGNMENT") ? <EmptyState title="Todavía no hay profesionales" description="Agregá profesionales y habilitá los servicios que prestan para comenzar a asignar reservas." /> : <>
+        {!visible.length ? <div role="status" className="rounded-xl border border-[#E4E9E7] bg-white px-4 py-3 text-sm text-[#667078]">No hay reservas para este período. Podés crear una reserva cuando quieras.</div> : null}
+        <CalendarGrid mode={mode} columns={calendarColumns} setup={setup} appointments={visible} onSelect={(appointment) => setPanel({ mode: "detail", id: appointment.id })} startMinute={timeRange.start} endMinute={timeRange.end} />
+      </>}
     </div>
-  );
+    {panel && setup && organizationId ? <AgendaPanel key={`${panel.mode}:${"id" in panel ? panel.id : "new"}`} organizationId={organizationId} role={role} setup={setup} mode={panel.mode} date={date} appointment={selected} onClose={() => setPanel(null)} onChanged={onChanged} onMode={(next) => setPanel(panel && "id" in panel ? { mode: next, id: panel.id } : panel)} /> : null}
+  </main>;
 }
 
-function SummaryCard({ icon, tone, label, value, detail }: { icon: React.ReactNode; tone: "mint" | "blue" | "lavender"; label: string; value: string; detail: string }) {
-  const toneClass = { mint: "bg-[#DDF6E8] text-[#438C78]", blue: "bg-[#E8F0FF] text-[#5D86D5]", lavender: "bg-[#F0ECFF] text-[#8E7BC9]" }[tone];
-  return <div className="flex items-center gap-4 rounded-2xl border border-[#E4E9E7] bg-white p-4 shadow-[0_8px_24px_-20px_rgba(24,32,38,.18)]"><span className={"flex h-11 w-11 shrink-0 items-center justify-center rounded-xl " + toneClass}>{icon}</span><span><span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-[#79858B]">{label}</span><span className="mt-0.5 block text-xl font-bold leading-tight tracking-tight text-[#182026]">{value}</span><span className="block text-[11px] text-[#88949A]">{detail}</span></span></div>;
+function CalendarGrid({ mode, columns, setup, appointments, onSelect, startMinute, endMinute }: {
+  mode: Mode; columns: Array<{ id: string; label: string; staffMemberId: string | null; date: string }>;
+  setup: NonNullable<Awaited<ReturnType<typeof loadAgendaSetup>>>; appointments: AppointmentDTO[]; onSelect(appointment: AppointmentDTO): void; startMinute: number; endMinute: number;
+}) {
+  const gridTemplate = `64px repeat(${columns.length}, minmax(220px, 1fr))`;
+  const totalHeight = (endMinute - startMinute) / 60 * hourHeight;
+  const hours = Array.from({ length: Math.max(1, endMinute / 60 - startMinute / 60 + 1) }, (_, index) => startMinute / 60 + index);
+  const mobileBookings = [...appointments].sort((a, b) => a.startAt.localeCompare(b.startAt));
+  const mobileTimeOff = setup.calendars.flatMap((calendar) => calendar.timeOff.filter((block) => {
+    const startDate = localDateTime(block.startAt, setup.timeZone).date;
+    const endDate = localDateTime(block.endAt, setup.timeZone).date;
+    return columns.some((column) => startDate <= column.date && endDate >= column.date);
+  }).map((block) => ({ ...block, kind: calendar.kind })));
+  return <>
+    <div className="space-y-3 md:hidden">
+      {mobileBookings.map((item) => {
+        const local = localDateTime(item.startAt, setup.timeZone);
+        return <button key={item.id} type="button" onClick={() => onSelect(item)} aria-label={`Ver reserva de ${item.customerNameSnapshot}`} className={`flex w-full items-center gap-3 rounded-2xl border p-4 text-left shadow-sm ${appointmentTone(item.status)}`}>
+          <span className="w-14 shrink-0 text-sm font-bold">{local.time}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{item.customerNameSnapshot}</span><span className="mt-0.5 block truncate text-xs">{item.serviceNameSnapshot}{item.staffNameSnapshot ? ` · ${item.staffNameSnapshot}` : ""}</span><span className="mt-1 block text-[10px] font-semibold">{statusText(item.status)}{mode === "WEEK" ? ` · ${localDateLabel(local.date, { weekday: "short", day: "numeric", month: "short" })}` : ""}</span></span><CaretRight size={17} />
+        </button>;
+      })}
+      {mobileTimeOff.map((block) => <div key={block.id} className="flex items-center gap-3 rounded-2xl border border-[#E5D6C2] bg-[#FFF1E2] px-4 py-3 text-sm text-[#79572F]"><Clock size={17} /><span className="font-semibold">{block.kind === "BUSINESS" ? "Negocio cerrado" : "Ausencia de profesional"}</span><span className="ml-auto text-xs">{localDateTime(block.startAt, setup.timeZone).time} – {localDateTime(block.endAt, setup.timeZone).time}</span></div>)}
+    </div>
+    <div className="hidden min-h-0 flex-1 overflow-auto rounded-2xl border border-[#E4E9E7] bg-white shadow-[0_4px_20px_-2px_rgba(24,32,38,.04)] md:block">
+    <div style={{ display: "grid", gridTemplateColumns: gridTemplate, minWidth: "max-content" }} className="relative">
+      <div className="sticky top-0 left-0 z-30 border-b border-r border-[#E4E9E7] bg-[#F8FAF9]" />
+      {columns.map((column) => <div key={`head-${column.id}`} className="sticky top-0 z-20 border-b border-r border-[#E4E9E7] bg-[#F8FAF9] px-3 py-3 text-center"><p className="text-sm font-bold capitalize">{column.label}</p><p className="mt-0.5 truncate text-[11px] text-[#667078]">{mode === "DAY" ? column.staffMemberId ? setup.staff.find((person) => person.id === column.staffMemberId)?.name ?? "Profesional" : "Sin profesional" : setup.staff.length ? `${setup.staff.length} profesionales` : "Sin profesional"}</p></div>)}
+      <div className="sticky left-0 z-20 border-r border-[#E4E9E7] bg-white" style={{ height: totalHeight }}>
+        {hours.map((hour) => <div key={hour} className="relative border-t border-[#E4E9E7] pr-2 text-right text-[11px] font-medium text-[#667078]" style={{ height: hourHeight }}><span className="relative -top-2 bg-white px-1">{String(hour).padStart(2, "0")}:00</span></div>)}
+      </div>
+      {columns.map((column) => <CalendarColumn key={column.id} mode={mode} column={column} setup={setup} appointments={appointments} onSelect={onSelect} startMinute={startMinute} endMinute={endMinute} totalHeight={totalHeight} />)}
+    </div>
+    </div>
+  </>;
 }
+
+function CalendarColumn({ mode, column, setup, appointments, onSelect, startMinute, endMinute, totalHeight }: {
+  mode: Mode; column: { id: string; label: string; staffMemberId: string | null; date: string }; setup: NonNullable<Awaited<ReturnType<typeof loadAgendaSetup>>>;
+  appointments: AppointmentDTO[]; onSelect(appointment: AppointmentDTO): void; startMinute: number; endMinute: number; totalHeight: number;
+}) {
+  const date = column.date;
+  const inColumn = appointments.filter((item) => {
+    const local = localDateTime(item.startAt, setup.timeZone);
+    if (local.date !== date) return false;
+    return mode === "WEEK" || item.staffMemberId === column.staffMemberId || (!item.staffMemberId && !column.staffMemberId);
+  }).sort((a, b) => a.startAt.localeCompare(b.startAt));
+  const positioned = assignLanes(inColumn, setup.timeZone);
+  const closures = closureBlocks(setup, date, column.staffMemberId, startMinute, endMinute, mode);
+  const timeOffs = setup.calendars.flatMap((calendar) => calendar.timeOff.filter((block) => {
+    const localStart = localDateTime(block.startAt, setup.timeZone).date;
+    const localEnd = localDateTime(block.endAt, setup.timeZone).date;
+    return localStart <= date && localEnd >= date && (calendar.kind === "BUSINESS" || mode === "WEEK" || calendar.staffMemberId === column.staffMemberId);
+  }).map((block) => ({ calendar, block })));
+  return <div className="relative border-r border-[#E4E9E7] bg-white" style={{ height: totalHeight }}>
+    <div aria-hidden="true" className="absolute inset-0 pointer-events-none">{Array.from({ length: Math.floor(totalHeight / hourHeight) + 1 }, (_, index) => <div key={index} className="absolute left-0 right-0 border-t border-[#EDF0EF]" style={{ top: index * hourHeight }} />)}</div>
+    {closures.map((block, index) => <div key={`closed-${index}`} aria-label="Horario no disponible" className="absolute left-1 right-1 z-0 rounded-md bg-[repeating-linear-gradient(135deg,#f8faf9,#f8faf9_5px,#edf0ef_5px,#edf0ef_6px)]" style={{ top: minuteTop(block.start, startMinute), height: Math.max(3, minuteHeight(block.end - block.start)), pointerEvents: "none" }}><span className="sr-only">Horario no disponible</span></div>)}
+    {timeOffs.map(({ calendar, block }) => {
+      const startDate = localDateTime(block.startAt, setup.timeZone).date; const endDate = localDateTime(block.endAt, setup.timeZone).date;
+      const start = Math.max(startMinute, startDate < date ? startMinute : localMinute(block.startAt, setup.timeZone));
+      const end = Math.min(endMinute, endDate > date ? endMinute : localMinute(block.endAt, setup.timeZone));
+      if (end <= start) return null;
+      return <div key={block.id} aria-label={calendar.kind === "BUSINESS" ? "Negocio cerrado" : "Ausencia de profesional"} className="absolute left-1 right-1 z-10 overflow-hidden rounded-md border border-[#E5D6C2] bg-[#FFF1E2]/95 px-2 py-1 text-[10px] font-semibold text-[#79572F]" style={{ top: minuteTop(start, startMinute), height: Math.max(20, minuteHeight(end - start)) }}>{calendar.kind === "BUSINESS" ? "Cerrado" : "Ausencia"}</div>;
+    })}
+    {positioned.map(({ item, lane, laneCount }) => {
+      const start = localMinute(item.startAt, setup.timeZone); const end = Math.min(24 * 60, start + item.durationMinutes);
+      const top = minuteTop(start, startMinute); const height = Math.max(38, minuteHeight(Math.max(15, end - start)) - 4);
+      return <button key={item.id} type="button" onClick={() => onSelect(item)} aria-label={`Ver reserva de ${item.customerNameSnapshot}`} className={`absolute z-20 overflow-hidden rounded-lg border px-2 py-1.5 text-left shadow-sm transition hover:z-30 hover:brightness-[.98] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#182026] ${appointmentTone(item.status)}`} style={{ top: top + 2, height, left: `calc(${lane * 100 / laneCount}% + 3px)`, width: `calc(${100 / laneCount}% - 6px)` }}>
+        <span className="block truncate text-xs font-bold">{localDateTime(item.startAt, setup.timeZone).time} · {item.customerNameSnapshot}</span><span className="mt-0.5 block truncate text-[11px]">{item.serviceNameSnapshot}{item.staffNameSnapshot && mode === "WEEK" ? ` · ${item.staffNameSnapshot}` : ""}</span><span className="mt-1 block truncate text-[10px] font-semibold">{statusText(item.status)}</span>
+      </button>;
+    })}
+  </div>;
+}
+
+function assignLanes(items: AppointmentDTO[], timeZone: string) {
+  const ends: number[] = []; const positions: Array<{ item: AppointmentDTO; lane: number; laneCount: number }> = [];
+  for (const item of items) {
+    const start = localMinute(item.startAt, timeZone); const end = Math.min(24 * 60, start + item.durationMinutes);
+    let lane = ends.findIndex((lastEnd) => lastEnd <= start);
+    if (lane < 0) { lane = ends.length; ends.push(end); } else ends[lane] = end;
+    positions.push({ item, lane, laneCount: 1 });
+  }
+  // Each overlap group receives the same lane count so simultaneous bookings remain legible.
+  for (const position of positions) {
+    const start = localMinute(position.item.startAt, timeZone); const end = Math.min(24 * 60, start + position.item.durationMinutes);
+    position.laneCount = Math.max(1, positions.filter((other) => {
+      const otherStart = localMinute(other.item.startAt, timeZone); const otherEnd = Math.min(24 * 60, otherStart + other.item.durationMinutes);
+      return otherStart < end && otherEnd > start;
+    }).length);
+  }
+  return positions;
+}
+
+function dayColumns(setup: Awaited<ReturnType<typeof loadAgendaSetup>> | null, staffFilter: string) {
+  const staff = (setup?.staff ?? []).filter((person) => !staffFilter || person.id === staffFilter);
+  return [...staff.map((person) => ({ id: person.id, label: person.name, staffMemberId: person.id, date: "" })), { id: "none", label: "Sin asignación", staffMemberId: null, date: "" }];
+}
+function closureBlocks(setup: NonNullable<Awaited<ReturnType<typeof loadAgendaSetup>>>, date: string, staffId: string | null, start: number, end: number, mode: Mode) {
+  const business = setup.calendars.find((calendar) => calendar.kind === "BUSINESS");
+  const staff = staffId ? setup.calendars.find((calendar) => calendar.staffMemberId === staffId) : undefined;
+  const dayWindows = (calendar?: typeof business) => {
+    if (!calendar) return [] as Array<{ startMinute: number; endMinute: number }>;
+    const override = calendar.dayOverrides.find((item) => item.localDate.slice(0, 10) === date);
+    if (override) return override.windows;
+    const weekday = new Date(`${date}T12:00:00Z`).getUTCDay() || 7;
+    return calendar.weeklyWindows.filter((window) => window.weekday === weekday);
+  };
+  const businessWindows = dayWindows(business);
+  const effective = mode === "WEEK" || !staff ? businessWindows : intersectWindows(businessWindows, dayWindows(staff));
+  const normalized = effective.map((window) => ({ start: Math.max(start, window.startMinute), end: Math.min(end, window.endMinute) })).filter((window) => window.end > window.start).sort((a, b) => a.start - b.start);
+  const blocks: Array<{ start: number; end: number }> = []; let cursor = start;
+  for (const window of normalized) { if (window.start > cursor) blocks.push({ start: cursor, end: window.start }); cursor = Math.max(cursor, window.end); }
+  if (cursor < end) blocks.push({ start: cursor, end });
+  return blocks;
+}
+function intersectWindows(a: Array<{ startMinute: number; endMinute: number }>, b: Array<{ startMinute: number; endMinute: number }>) { return a.flatMap((left) => b.map((right) => ({ startMinute: Math.max(left.startMinute, right.startMinute), endMinute: Math.min(left.endMinute, right.endMinute) })).filter((window) => window.endMinute > window.startMinute)); }
+function computeTimeRange(setup: Awaited<ReturnType<typeof loadAgendaSetup>> | null, appointments: AppointmentDTO[]) {
+  const starts = setup?.calendars.flatMap((calendar) => calendar.weeklyWindows.map((window) => window.startMinute)) ?? [];
+  const ends = setup?.calendars.flatMap((calendar) => calendar.weeklyWindows.map((window) => window.endMinute)) ?? [];
+  for (const item of appointments) { const start = localMinute(item.startAt, setup?.timeZone ?? "UTC"); starts.push(start); ends.push(Math.min(24 * 60, start + item.durationMinutes)); }
+  const min = starts.length ? Math.min(...starts) : 8 * 60; const max = ends.length ? Math.max(...ends) : 20 * 60;
+  const start = Math.max(0, Math.floor(min / 60) * 60); const end = Math.min(24 * 60, Math.ceil(max / 60) * 60);
+  return { start: start === end ? 8 * 60 : start, end: start === end ? 20 * 60 : end };
+}
+function todayDate(timeZone = "UTC") { const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()); return `${parts.find((part) => part.type === "year")?.value}-${parts.find((part) => part.type === "month")?.value}-${parts.find((part) => part.type === "day")?.value}`; }
+function mondayOf(date: string) { const weekday = new Date(`${date}T12:00:00Z`).getUTCDay() || 7; return addDate(date, 1 - weekday); }
+function validDate(date: string) { const [year, month, day] = date.split("-").map(Number); const parsed = new Date(Date.UTC(year!, month! - 1, day!)); return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month! - 1 && parsed.getUTCDate() === day; }
+function minuteTop(minute: number, startMinute: number) { return (minute - startMinute) / 60 * hourHeight; }
+function minuteHeight(minutes: number) { return minutes / 60 * hourHeight; }
+function modeButton(active: boolean) { return `rounded-lg px-3 py-1.5 text-sm font-bold transition ${active ? "border border-[#E4E9E7] bg-[#F8FAF9] text-[#182026] shadow-sm" : "text-[#667078] hover:text-[#182026]"}`; }
+function appointmentTone(status: AppointmentDTO["status"]) { return status === "CONFIRMED" ? "border-[#7EA8F8] bg-[#E8F0FF] text-[#294B7D]" : status === "COMPLETED" ? "border-[#7ED6A5] bg-[#DDF6E8] text-[#2E6A48]" : status === "NO_SHOW" ? "border-[#F87E7E] bg-[#FFE8E8] text-[#8F3434]" : "border-[#D7DEDB] bg-[#F0F2F1] text-[#667078]"; }
+function statusText(status: AppointmentDTO["status"]) { return ({ CONFIRMED: "Confirmada", COMPLETED: "Completada", CANCELLED: "Cancelada", NO_SHOW: "Ausencia" } as const)[status]; }
+function errorMessage(error: unknown) { if (error instanceof ApiError && error.status === 401) return "La sesión expiró. Volvé a iniciar sesión."; if (error instanceof ApiError && error.status === 403) return "No tenés permisos para consultar esta agenda."; return error instanceof Error ? error.message : "No pudimos completar la operación."; }

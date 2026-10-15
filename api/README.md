@@ -19,7 +19,7 @@ La API escucha por defecto en `http://localhost:3001/api`. El navegador accede a
 - `WEB_ORIGIN`: origen permitido por CORS, por defecto `http://localhost:3000` fuera de producción.
 - `DATABASE_URL`: conexión pooled utilizada por el runtime.
 - `DIRECT_URL`: conexión directa utilizada por Prisma CLI.
-- `CSRF_SECRET`, `RATE_LIMIT_SECRET`: secretos independientes de al menos 32 bytes, administrados fuera del repositorio.
+- `CSRF_SECRET`, `RATE_LIMIT_SECRET`, `BOOKING_SUBMISSION_SECRET`, `MANAGEMENT_TOKEN_SECRET`: secretos independientes de al menos 32 bytes, administrados fuera del repositorio. Las versiones `BOOKING_SUBMISSION_SECRET_VERSION`/`MANAGEMENT_TOKEN_SECRET_VERSION` y sus mapas `*_PREVIOUS_SECRETS` permiten validar idempotencia y enlaces durante la rotación; conservar claves anteriores hasta que sus submissions o enlaces expiren o se revoquen.
 - `RESEND_API_KEY`, `EMAIL_FROM`: credenciales server-side para correo de verificación y recuperación.
 - `TRUSTED_PROXY_CIDRS`: proxies de confianza explícitos del despliegue, cuando apliquen.
 

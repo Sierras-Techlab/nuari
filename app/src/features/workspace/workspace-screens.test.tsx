@@ -8,8 +8,6 @@ vi.mock("@/features/access/access-provider", async (importOriginal) => {
   return { ...actual, useAccess: () => ({ preflight: async () => undefined }) };
 });
 
-import { AgendaScreen } from "@/features/appointments/agenda-screen";
-import { DemoAppointmentProvider } from "@/features/appointments/demo-provider";
 
 import { CashScreen } from "./cash-screen";
 import { WorkspaceProvider } from "./workspace-provider";
@@ -35,13 +33,4 @@ describe("workspace sections", () => {
     expect(screen.queryByText("Ingreso manual")).toBeNull();
   });
 
-  it("keeps demo services and professionals available to the local appointment prototype", async () => {
-    const tree = (child: React.ReactNode) => <WorkspaceProvider><DemoAppointmentProvider>{child}</DemoAppointmentProvider></WorkspaceProvider>;
-    render(tree(<AgendaScreen />));
-    const newAppointment = await screen.findByRole("button", { name: "Nuevo turno" });
-    await waitFor(() => expect((newAppointment as HTMLButtonElement).disabled).toBe(false));
-    fireEvent.click(newAppointment);
-    expect(screen.getByRole("option", { name: /Servicio estándar/ })).toBeTruthy();
-    expect(screen.getAllByRole("option", { name: "Martín Ríos" })).toHaveLength(2);
-  });
 });

@@ -8,7 +8,6 @@ import type { AccessSnapshot } from "@/lib/api/contracts";
 import { ApiError, toApiError } from "@/lib/api/errors";
 import { AppShell } from "@/components/layout/app-shell";
 import { WorkspaceProvider } from "@/features/workspace/workspace-provider";
-import { DemoAppointmentProvider } from "@/features/appointments/demo-provider";
 import { SubscriptionPanel } from "./subscription-panel";
 
 type AccessContextValue = {
@@ -135,5 +134,5 @@ export function PrivateWorkspace({ children }: { children: ReactNode }) {
   const { snapshot, error, refresh } = useAccess();
   if (!snapshot) return <div className="min-h-screen bg-[#F8FAF9] p-8"><section role="status" className="rounded-2xl border border-[#E4E9E7] bg-white p-6"><p>{error ?? "Comprobando tu acceso…"}</p>{error ? <button type="button" className="mt-4 text-sm font-bold" onClick={() => void refresh()}>Reintentar</button> : null}</section></div>;
   const key = `${snapshot.user.id}:${snapshot.activeOrganizationId}`;
-  return <AppShell>{snapshot.access?.businessAllowed && snapshot.activeOrganizationId ? <WorkspaceProvider key={key}><DemoAppointmentProvider>{children}</DemoAppointmentProvider></WorkspaceProvider> : <SubscriptionPanel key={key} />}</AppShell>;
+  return <AppShell>{snapshot.access?.businessAllowed && snapshot.activeOrganizationId ? <WorkspaceProvider key={key}>{children}</WorkspaceProvider> : <SubscriptionPanel key={key} />}</AppShell>;
 }

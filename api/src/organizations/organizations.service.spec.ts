@@ -51,6 +51,8 @@ function setup(overrides: { existing?: object | null; members?: object[]; grant?
     onboardingSubmission: { findUnique: vi.fn().mockResolvedValue(overrides.existing ?? null), create: vi.fn().mockResolvedValue({}) },
     organization: { create: vi.fn().mockResolvedValue(org), findUnique: vi.fn().mockResolvedValue(org), update: vi.fn().mockResolvedValue(org) },
     service: { findFirst: vi.fn().mockResolvedValue(null), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    schedulingSettings: { create: vi.fn().mockResolvedValue({}) },
+    bookingCalendar: { create: vi.fn().mockResolvedValue({}) },
     organizationAuditLog: { create: vi.fn().mockResolvedValue({}) },
   };
   const db = {
@@ -64,8 +66,9 @@ function setup(overrides: { existing?: object | null; members?: object[]; grant?
   const subscriptions = { hasTrialGrant: vi.fn().mockResolvedValue(overrides.grant ?? false), createTrial: vi.fn().mockResolvedValue(undefined), state: vi.fn().mockResolvedValue({ subscription: { id: 'sub-id' }, access: { businessAllowed: true } }) };
   const clock = { now: vi.fn().mockReturnValue(now) };
   const emails = { enqueue: vi.fn() };
+  const schedulingRead = { assertTimeZoneChangeAllowed: vi.fn().mockResolvedValue(undefined) };
 
-  return { service: new OrganizationsService(db as never, identity as never, subscriptions as never, clock as never, emails as never), tx, db, identity, subscriptions, clock, emails };
+  return { service: new OrganizationsService(db as never, identity as never, subscriptions as never, clock as never, emails as never, schedulingRead as never), tx, db, identity, subscriptions, clock, emails, schedulingRead };
 }
 
 
@@ -76,6 +79,8 @@ describe('OrganizationsService initial onboarding', () => {
     expect(db.$transaction).toHaveBeenCalledOnce();
     expect(identity.lockUser).toHaveBeenCalledWith(tx, 'user-id');
     expect(tx.organization.create).toHaveBeenCalledWith({ data: { name: input.name, slug: input.slug, businessType: input.businessType, createdAt: now, updatedAt: now } });
+    expect(tx.schedulingSettings.create).toHaveBeenCalledWith({ data: { organizationId: org.id } });
+    expect(tx.bookingCalendar.create).toHaveBeenCalledWith({ data: { organizationId: org.id, kind: 'BUSINESS' } });
     expect(tx.organizationMember.create).toHaveBeenCalledWith({ data: { userId: 'user-id', organizationId: org.id, role: 'OWNER', status: 'ACTIVE', createdAt: now, updatedAt: now } });
     expect(subscriptions.createTrial).toHaveBeenCalledWith(tx, 'user-id', org.id, 'BASIC', now);
     expect(tx.onboardingSubmission.create).toHaveBeenCalledWith({ data: { userId: 'user-id', key: 'key', requestHash: onboardingRequestHash(input), organizationId: org.id, createdAt: now } });
@@ -202,8 +207,11 @@ describe('OrganizationsService updateSettings', () => {
   });
 
   it('updates descriptive currency atomically for services with no price after confirmation', async () => {
-    const { service, tx } = setup();
+    const { service, tx, schedulingRead } = setup();
     await service.updateSettings(member, 'user-id', { country: 'UY', confirmCurrencyChange: true });
+    expect(schedulingRead.assertTimeZoneChangeAllowed).toHaveBeenCalledWith(
+      { organizationId: org.id }, tx, now,
+    );
     expect(tx.organization.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: org.id }, data: expect.objectContaining({ country: 'UY', currency: 'UYU' }),
     }));
@@ -211,6 +219,21 @@ describe('OrganizationsService updateSettings', () => {
       where: { organizationId: org.id, price: null },
       data: expect.objectContaining({ currency: 'UYU', version: { increment: 1 }, updatedAt: now }),
     }));
+  });
+
+  it('blocks an effective timezone change through the transactional scheduling projection', async () => {
+    const { service, tx, schedulingRead } = setup();
+    schedulingRead.assertTimeZoneChangeAllowed.mockRejectedValueOnce({
+      status: 409,
+      response: { code: 'TIMEZONE_CHANGE_BLOCKED' },
+    });
+    await expect(service.updateSettings(member, 'user-id', {
+      timezone: 'America/Argentina/Cordoba',
+    })).rejects.toMatchObject({ response: { code: 'TIMEZONE_CHANGE_BLOCKED' } });
+    expect(schedulingRead.assertTimeZoneChangeAllowed).toHaveBeenCalledWith(
+      { organizationId: org.id }, tx, now,
+    );
+    expect(tx.organization.update).not.toHaveBeenCalled();
   });
 
   it('allows OWNER to update commercial settings, slug, and records audit log', async () => {

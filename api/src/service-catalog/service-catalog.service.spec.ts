@@ -31,6 +31,17 @@ describe('ServiceCatalogService', () => {
     expect(db.service.findFirst).toHaveBeenCalledWith({ where: { id: 'service-id', organizationId: context.organizationId } });
   });
 
+  it('exposes an active bookable-service projection without returning financial fields', async () => {
+    const { catalog, tx } = setup();
+    await expect(catalog.getBookableService({ organizationId: context.organizationId }, 'service-id')).resolves.toMatchObject({
+      id: 'service-id', durationMinutes: 40, staffSelectionMode: 'NO_ASSIGNMENT', active: true,
+    });
+    expect(tx.service.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'service-id', organizationId: context.organizationId, active: true },
+      select: expect.objectContaining({ id: true, durationMinutes: true, staffSelectionMode: true }),
+    }));
+  });
+
   it('locks and reads the tenant currency before persisting an exact zero price', async () => {
     const { catalog, tx, organizations } = setup();
     const result = await catalog.create(context, {

@@ -8,7 +8,7 @@ El éxito inicial no se medirá por la cantidad de módulos construidos, sino po
 
 ## Estrategia de alcance
 
-El MVP debe implementar un único flujo vertical para un tipo de negocio piloto. Barberías y negocios de servicios similares son el segmento inicial de exploración; todavía falta seleccionar un piloto concreto, observar su operación y acordar una métrica. La interfaz genérica **Turnero** tiene pantallas navegables para agenda, servicios, clientes, caja y equipo con datos locales; no valida aún el MVP ni fija contratos definitivos de negocio. Su alcance de frontend está en [`TASK-04`](../tasks/TASK-04-turnero-workspace-front.md).
+El MVP debe implementar un único flujo vertical para un tipo de negocio piloto. Barberías y negocios de servicios similares son el segmento inicial de exploración; todavía falta seleccionar un piloto concreto, observar su operación y acordar una métrica. La interfaz genérica **Turnero** conserva Agenda y Caja con datos locales; Clientes, Servicios y Profesionales usan persistencia API según [`TASK-09`](../tasks/TASK-09-feat-003-operational-catalog.md), y Equipo administra accesos reales. Esto no valida aún el MVP. [`TASK-04`](../tasks/TASK-04-turnero-workspace-front.md) conserva el alcance visual original; [`TASK-10`](../tasks/TASK-10-feat-004-scheduling-availability-appointments.md) propone agenda/disponibilidad, sin autorizar implementación ni sustituir el acuerdo del piloto.
 
 Antes de iniciar funcionalidades de dominio se debe decidir:
 

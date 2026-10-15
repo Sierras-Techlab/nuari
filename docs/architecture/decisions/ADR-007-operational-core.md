@@ -1,15 +1,15 @@
 # ADR-007: Núcleo operativo de clientes, servicios y personal
 
-- Estado: Diseño documentado; decisiones seleccionadas de producto y técnicas cerradas. B1 (modelos, relaciones e integridad multi-tenant), B2 (permisos explícitos, contexto y helpers base), B3 (API de clientes) y B4 (API de categorías/servicios y protección monetaria) completados con autorización del usuario. B5–B10 no autorizados.
+- Estado: Decisiones seleccionadas de producto y técnicas cerradas; FEAT-003 B1–B10 completados con autorización del usuario. Las propuestas fuera de ese alcance conservan sus pendientes.
 - Fecha: 2026-10-14.
 - Contrato detallado: [TASK-09 — FEAT-003](../../tasks/TASK-09-feat-003-operational-catalog.md).
-- Implementación: B1 aplicado en Neon dev mediante `20261014140000_operational_catalog`; B2 implementado sin migración; B3 expone la API de clientes; B4 expone categorías/servicios y protección monetaria, sin cambios de esquema. Verificaciones registradas en TASK-09. B5–B10 no autorizados.
+- Implementación: B1 aplicado en Neon dev mediante `20261014140000_operational_catalog`; B2 agrega permisos/helpers; B3–B6 implementan APIs de clientes, catálogo, profesionales y habilitaciones; B7–B9 integran sus pantallas; B10 verifica el flujo cruzado. Verificaciones y límites de FEAT-003 constan en TASK-09. La Agenda administrativa ahora está integrada con FEAT-004 B1–B8a; su diseño y contratos vigentes constan en ADR-008/009 y la revisión visual está pendiente.
 
 ## Contexto
 
-FEAT-001 y FEAT-002 implementan identidad, organizaciones, membresías y suscripción. Clientes y Servicios siguen siendo demostraciones locales en frontend, aunque sus APIs backend ya persisten los datos. `/app/equipo` administra cuentas con acceso y no debe convertirse en el directorio de trabajadores.
+FEAT-001 y FEAT-002 implementan identidad, organizaciones, membresías y suscripción. Clientes, Servicios y Profesionales consumen persistencia API desde FEAT-003. `/app/equipo` administra cuentas con acceso y no debe convertirse en el directorio de trabajadores.
 
-Servicios/Turnero es la primera vertical funcional prevista. Comercio y Hotelería necesitan reutilizar clientes y personal básico sin heredar reglas de agenda ni un catálogo universal de entidades incompatibles. Clientes y Servicios siguen siendo demostraciones locales en frontend, aunque sus APIs backend ya persisten los datos.
+Servicios/Turnero es la primera vertical funcional prevista. Comercio y Hotelería necesitan reutilizar clientes y personal básico sin heredar reglas de agenda ni un catálogo universal de entidades incompatibles. Agenda y Caja conservan demostraciones locales.
 
 ## Decisiones de producto aprobadas — 2026-10-14
 
@@ -59,7 +59,7 @@ Estas decisiones de producto están aprobadas, sin aceptar por ello todas las re
 
 - Se implementó el módulo NestJS de clientes con listados/ficha, alta, PATCH versionado y candidatos de duplicado limitados a la organización del `TenantContext`.
 - Las rutas aplican sesión, membresía, permiso y acceso comercial; notes se proyecta/escribe sólo con permiso. Las mutaciones y su auditoría transaccional no guardan valores de contacto o notas en metadata.
-- B3 reutiliza el modelo Customer de B1: no agregó ni aplicó migraciones. Categorías, servicios, personal y frontend permanecen pendientes.
+- B3 reutiliza el modelo Customer de B1: no agregó ni aplicó migraciones. Categorías, servicios, personal y frontend se completaron en los bloques posteriores de TASK-09.
 - La implementación sigue las decisiones y el contrato ya escritos en TASK-09; no resuelve retención, piloto ni otros mecanismos pendientes.
 
 ## Implementación B4
@@ -69,18 +69,24 @@ Estas decisiones de producto están aprobadas, sin aceptar por ello todas las re
 - El PATCH de organización incluye el campo de confirmación `confirmCurrencyChange` ya definido en TASK-09. Con cambio efectivo requiere confirmación; si existe cualquier precio persistido responde 409 aun si está en cero o el servicio inactivo. Sin precios, actualiza atómicamente moneda y versiones de servicios sin precio. No se modificó el frontend ni se creó/aplicó migración en B4.
 - Las pruebas de comportamiento B4 y el estado de migraciones se registran en TASK-09. No se ejecutaron suites completas ni Playwright.
 
-## Diseño técnico y bloques restantes
+## Implementación B5–B10
+
+- B5 implementa fichas laborales con directorio mínimo y ficha administrativa; B6 implementa habilitaciones bidireccionales con permisos conjuntos, versiones y locks Service → StaffMember. No se crean cuentas, membresías ni vínculos automáticos.
+- B7–B9 conectan Clientes, Servicios y Profesionales a las APIs reales; Equipo conserva miembros con acceso. Agenda mantiene su catálogo demo local.
+- B10 valida persistencia, recarga/relogin, dos tenants, permisos, revocación y vencimiento por HTTP y Playwright build/start; evidencia y límites en TASK-09. No creó ni aplicó migraciones. Revisión visual Canvas, constraints directos en DB desechable y despliegue desde cero siguen pendientes.
+
+## Diseño técnico vigente y límites
 
 - Mantener el monolito modular y la API como única autoridad de negocio y PostgreSQL.
-- Customers está implementado en B3 y ServiceCatalog en B4; falta el módulo Staff sobre los modelos persistidos en B1. Posponer Contact/Party genérico hasta que exista un caso validado.
-- Implementar Staff y las habilitaciones profesional–servicio en sus bloques autorizados; duración, precio y selección de profesional no pertenecen a productos ni habitaciones.
+- Customers, ServiceCatalog y Staff están implementados sobre los modelos persistidos en B1. Posponer Contact/Party genérico hasta que exista un caso validado.
+- Staff implementa habilitaciones profesional–servicio; duración, precio y selección de profesional no pertenecen a productos ni habitaciones.
 - Mantener `organizationId` en el scope explícito de todas las consultas y no depender de RLS. Las FK compuestas de categoría-servicio y profesional-servicio ya están aplicadas.
-- Implementar los modos aprobados sin herencia inicial y sin calcular disponibilidad ni asignar ahora. Quitar/desactivar habilitaciones no modifica automáticamente el modo guardado.
+- Los modos aprobados se persisten sin herencia inicial; FEAT-003 no calcula disponibilidad ni asigna. Quitar/desactivar habilitaciones no modifica automáticamente el modo guardado.
 - B4 aplica Decimal(12,2), moneda derivada de Organization y el protocolo transaccional de TASK-09. Bloquea Organization al cambiar moneda y al crear/editar servicios, de modo que fijar el primer precio concurrentemente no escape a la comprobación. Futuras ventas/pagos/caja persistidos deberán extender la detección de importes.
-- Incorporar permisos de dominio explícitos a los roles actuales y versiones optimistas para mutaciones nuevas. No construir un sistema ACL configurable ahora.
-- Usar archivo/reactivación; futuras reservas y ventas conservarán sus propias condiciones históricas y referencias tenant-aware.
+- Las mutaciones del catálogo aplican permisos de dominio explícitos y versiones optimistas. FEAT-003 no incorpora un sistema ACL configurable.
+- El catálogo usa archivo/reactivación; futuras reservas y ventas conservarán sus propias condiciones históricas y referencias tenant-aware.
 
-Límites, permisos, DTOs y bloques verificables están definidos en TASK-09. Notas internas, archivo lógico, privacidad del personal, duplicados, decimal exacto sin conversión, selección por servicio, duración y separación de navegación ya son decisiones de producto cerradas. Las decisiones técnicas enumeradas arriba también están cerradas; piloto/métrica/retención y features futuras mantienen sus pendientes. B1–B4 están completados; esta autorización no autoriza B5–B10.
+Límites, permisos, DTOs y bloques verificables están definidos en TASK-09. Notas internas, archivo lógico, privacidad del personal, duplicados, decimal exacto sin conversión, selección por servicio, duración y separación de navegación ya son decisiones de producto cerradas. Las decisiones técnicas enumeradas arriba también están cerradas; piloto/métrica/retención y features futuras mantienen sus pendientes. B1–B10 están completados; su cierre no autoriza FEAT-004 ni propuestas fuera de alcance.
 
 ## Alternativas
 
@@ -88,7 +94,7 @@ Contact/Party genérico se pospone porque introduce roles y abstracciones sin co
 
 ## Consecuencias
 
-La primera vertical obtiene persistencia real sin acoplar cuentas a trabajadores ni compartir PII entre negocios. Se requiere una modificación puntual al cambio regional de FEAT-002 para preservar el significado de los precios. Prisma 7.10 valida las relaciones compuestas y PostgreSQL recibió las restricciones B1; faltan pruebas negativas directas en DB desechable y validaciones de comportamiento cuando se implementen endpoints.
+La primera vertical obtiene catálogo persistente sin acoplar cuentas a trabajadores ni compartir PII entre negocios. B4 incorporó la protección del cambio regional de FEAT-002 para preservar el significado de los precios. Prisma 7.10 valida las relaciones compuestas y PostgreSQL recibió las restricciones B1; las verificaciones de comportamiento están registradas en TASK-09. Faltan pruebas negativas directas de constraints en DB desechable y despliegue desde cero.
 
 La gestión de personal usa /app/profesionales con etiqueta Profesionales. Clientes y Servicios conservan rutas; /app/equipo y su etiqueta Equipo permanecen para miembros con acceso. Agenda, ventas, inventario, comisiones y disponibilidad permanecen fuera.
 
@@ -100,4 +106,4 @@ La habilitación opcional por Organization será independiente de las capacidade
 
 ## Aprobación y evolución
 
-Conservar los puntos aprobados sin reabrir notas, mecanismo de archivo, privacidad del personal, duplicados, decimal sin conversión, configuración por servicio, duración 5–720 ni separación de navegación. El cierre técnico incorpora Decimal(12,2), confirmación y bloqueo monetario, modos/default condicional, presencial inicial, archivo OWNER/ADMIN y ruta/etiqueta Profesionales; no volver a pedir esas decisiones. B1 fue aplicado al destino Neon `dev` `ep-shiny-firefly-b6z1ay37` tras revisar la migración aditiva. B2 implementa la matriz y los helpers descritos en TASK-09, B3 la API de clientes y B4 las APIs de catálogo/protección monetaria allí contratadas. Estas autorizaciones no convierten otras propuestas técnicas en decisiones aprobadas ni autorizan B5–B10. Los detalles de capacidades, ventas, asistencia y reportes se aprobarán en sus propias features. Actualizar tarea y ADR juntos si cambia el contrato; los ADR-001, ADR-003, ADR-005 y ADR-006 siguen vigentes.
+Conservar los puntos aprobados sin reabrir notas, mecanismo de archivo, privacidad del personal, duplicados, decimal sin conversión, configuración por servicio, duración 5–720 ni separación de navegación. El cierre técnico incorpora Decimal(12,2), confirmación y bloqueo monetario, modos/default condicional, presencial inicial, archivo OWNER/ADMIN y ruta/etiqueta Profesionales. B1–B10 están completados según TASK-09; sus autorizaciones no convierten otras propuestas en decisiones aprobadas. [TASK-10](../../tasks/TASK-10-feat-004-scheduling-availability-appointments.md) conserva pendientes acotados de FEAT-004; personalización aprobada en [ADR-008](ADR-008-scheduling-personalization.md) y seis decisiones seleccionadas en [ADR-009](ADR-009-scheduling-core-decisions.md), sin modificar decisiones de este ADR ni iniciar implementación. Los detalles de capacidades futuras, ventas, asistencia y reportes se aprobarán en sus propias features. Actualizar tarea y ADR juntos si cambia el contrato; los ADR-001, ADR-003, ADR-005 y ADR-006 siguen vigentes.

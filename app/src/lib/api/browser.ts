@@ -41,6 +41,26 @@ import {
   type UpdateOrganizationInput,
   type UserDTO,
   type WorkspaceDTO,
+  type AppointmentDTO,
+  type AppointmentPageDTO,
+  type AppointmentListQuery,
+  type AppointmentCreateInput,
+  type AppointmentCancelReason,
+  type AvailabilityDTO,
+  type AvailabilityQuery,
+  type BookingCalendarDTO,
+  type SchedulingSettingsDTO,
+  type PublicBookingCatalogDTO,
+  type PublicBookingStaffPageDTO,
+  type PublicAvailabilityQuery,
+  type PublicAvailabilityDTO,
+  type PublicBookingCreateInput,
+  type PublicBookingReceiptDTO,
+  type PublicManagedBookingDTO,
+  type PublicRescheduleAvailabilityQuery,
+  type PublicRescheduleInput,
+  type PublicCancelInput,
+  type PublicManagedBookingResultDTO,
 } from "./contracts";
 
 import { ApiError, toApiError } from "./errors";
@@ -274,6 +294,59 @@ export async function getServiceStaff(organizationId: string, serviceId: string,
   try { return (await getApiClient().get<StaffServicePageDTO>(`/organizations/${encodeURIComponent(organizationId)}/services/${encodeURIComponent(serviceId)}/staff`, { params: query, signal })).data; }
   catch (error) { throw toApiError(error); }
 }
+
+export async function getAppointments(organizationId: string, query: AppointmentListQuery, signal?: AbortSignal): Promise<AppointmentPageDTO> {
+  try { return (await getApiClient().get<AppointmentPageDTO>(`/organizations/${encodeURIComponent(organizationId)}/appointments`, { params: query, signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export async function getAppointment(organizationId: string, appointmentId: string, signal?: AbortSignal): Promise<AppointmentDTO> {
+  try { return (await getApiClient().get<AppointmentDTO>(`/organizations/${encodeURIComponent(organizationId)}/appointments/${encodeURIComponent(appointmentId)}`, { signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export async function getAvailability(organizationId: string, query: AvailabilityQuery, signal?: AbortSignal): Promise<AvailabilityDTO> {
+  try { return (await getApiClient().get<AvailabilityDTO>(`/organizations/${encodeURIComponent(organizationId)}/availability`, { params: query, signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export async function getSchedulingSettings(organizationId: string, signal?: AbortSignal): Promise<SchedulingSettingsDTO> {
+  try { return (await getApiClient().get<SchedulingSettingsDTO>(`/organizations/${encodeURIComponent(organizationId)}/scheduling/settings`, { signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export async function getBookingCalendars(organizationId: string, signal?: AbortSignal): Promise<BookingCalendarDTO[]> {
+  try { return (await getApiClient().get<BookingCalendarDTO[]>(`/organizations/${encodeURIComponent(organizationId)}/scheduling/calendars`, { signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export const createAppointment = (organizationId: string, input: AppointmentCreateInput, idempotencyKey: string) =>
+  apiMutation<AppointmentDTO>(`/organizations/${encodeURIComponent(organizationId)}/appointments`, input, { headers: { "Idempotency-Key": idempotencyKey } });
+export const cancelAppointment = (organizationId: string, appointmentId: string, version: number, reasonCode: AppointmentCancelReason) =>
+  apiMutation<AppointmentDTO>(`/organizations/${encodeURIComponent(organizationId)}/appointments/${encodeURIComponent(appointmentId)}/cancel`, { reasonCode }, { headers: { "If-Match": `"${version}"` } });
+export const rescheduleAppointment = (organizationId: string, appointmentId: string, input: Pick<AppointmentCreateInput, "startAt" | "assignment">, version: number) =>
+  apiMutation<AppointmentDTO>(`/organizations/${encodeURIComponent(organizationId)}/appointments/${encodeURIComponent(appointmentId)}/reschedule`, input, { headers: { "If-Match": `"${version}"` } });
+export const closeAppointment = (organizationId: string, appointmentId: string, status: "complete" | "no-show", version: number) =>
+  apiMutation<AppointmentDTO>(`/organizations/${encodeURIComponent(organizationId)}/appointments/${encodeURIComponent(appointmentId)}/${status}`, {}, { headers: { "If-Match": `"${version}"` } });
+
+export async function getPublicBookingCatalog(slug: string, signal?: AbortSignal): Promise<PublicBookingCatalogDTO> {
+  try { return (await getApiClient().get<PublicBookingCatalogDTO>(`/public/booking/${encodeURIComponent(slug)}/catalog`, { signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export async function getPublicBookingStaff(slug: string, serviceId: string, offset: number, signal?: AbortSignal): Promise<PublicBookingStaffPageDTO> {
+  try { return (await getApiClient().get<PublicBookingStaffPageDTO>(`/public/booking/${encodeURIComponent(slug)}/services/${encodeURIComponent(serviceId)}/staff`, { params: { offset }, signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export async function getPublicAvailability(slug: string, query: PublicAvailabilityQuery, signal?: AbortSignal): Promise<PublicAvailabilityDTO> {
+  try { return (await getApiClient().get<PublicAvailabilityDTO>(`/public/booking/${encodeURIComponent(slug)}/availability`, { params: query, signal })).data; }
+  catch (error) { throw toApiError(error); }
+}
+export const createPublicBooking = (slug: string, input: PublicBookingCreateInput, idempotencyKey: string) =>
+  apiMutation<PublicBookingReceiptDTO>(`/public/booking/${encodeURIComponent(slug)}/appointments`, input, { headers: { "Idempotency-Key": idempotencyKey } });
+export const getPublicManagedBooking = (slug: string, token: string, signal?: AbortSignal) =>
+  apiMutation<PublicManagedBookingDTO>(`/public/booking/${encodeURIComponent(slug)}/manage/resolve`, { token }, signal ? { signal } : {});
+export const getPublicRescheduleAvailability = (slug: string, appointmentId: string, token: string, query: PublicRescheduleAvailabilityQuery, version: number, signal?: AbortSignal) =>
+  apiMutation<PublicAvailabilityDTO>(`/public/booking/${encodeURIComponent(slug)}/manage/${encodeURIComponent(appointmentId)}/availability`, { token, ...query }, { headers: { "If-Match": `"${version}"` }, ...(signal ? { signal } : {}) });
+export const reschedulePublicBooking = (slug: string, appointmentId: string, input: PublicRescheduleInput, version: number) =>
+  apiMutation<PublicManagedBookingResultDTO>(`/public/booking/${encodeURIComponent(slug)}/manage/${encodeURIComponent(appointmentId)}/reschedule`, input, { headers: { "If-Match": `"${version}"` } });
+export const cancelPublicBooking = (slug: string, appointmentId: string, input: PublicCancelInput, version: number) =>
+  apiMutation<PublicManagedBookingResultDTO>(`/public/booking/${encodeURIComponent(slug)}/manage/${encodeURIComponent(appointmentId)}/cancel`, input, { headers: { "If-Match": `"${version}"` } });
+
 export const addStaffToService = (organizationId: string, serviceId: string, staffMemberId: string, version: number) =>
   apiPutVersioned<StaffServiceMutationDTO>(`/organizations/${encodeURIComponent(organizationId)}/services/${encodeURIComponent(serviceId)}/staff/${encodeURIComponent(staffMemberId)}`, {}, version);
 export const removeStaffFromService = (organizationId: string, serviceId: string, staffMemberId: string, version: number) =>

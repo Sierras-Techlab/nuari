@@ -1,0 +1,92 @@
+.page {
+  font-family: Satoshi, var(--font-manrope), sans-serif;
+}
+
+.mesh {
+  z-index: 0;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: .4;
+  animation: drift 20s ease-in-out infinite alternate;
+}
+
+.blobBlue {
+  top: 10%;
+  left: 10%;
+  width: 18rem;
+  height: 18rem;
+  background: #e8f0ff;
+}
+
+.blobMint {
+  top: 40%;
+  right: -6rem;
+  width: 24rem;
+  height: 24rem;
+  background: #ddf6e8;
+  opacity: .3;
+}
+
+.enter {
+  animation: enter .5s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.success {
+  animation: pop-in .6s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.modalOverlay {
+  animation: overlay-in .22s ease both;
+}
+
+.dialogSheet {
+  animation: sheet-in .4s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+@keyframes drift {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(2%, 3%) scale(1.05); }
+  100% { transform: translate(-2%, -1%) scale(.95); }
+}
+
+@keyframes enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(.8); }
+  70% { transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sheet-in {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (min-width: 640px) {
+  .dialogSheet { animation-name: dialog-in; }
+}
+
+@keyframes dialog-in {
+  from { opacity: 0; transform: scale(.95) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blob,
+  .enter,
+  .success,
+  .modalOverlay,
+  .dialogSheet { animation: none; }
+}
